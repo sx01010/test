@@ -1,0 +1,1437 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mathematics · 交互原型</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<style>
+/* ============================================================
+   配色原则：低饱和基底 + 单一强调色只用于主操作
+   参考 Neuron UX《What Are Muted Colors》：muted base 让眼睛在长
+   时间阅读中不易疲劳，饱和色只留给必须被看到的那一个动作。
+   ============================================================ */
+[data-theme="warm"]{
+  --bg:#FBF7F1; --paper:#FFFFFF; --paper-2:#F7F1E9;
+  --ink:#463C34; --ink-soft:#8B7E71;
+  --line:#EBE1D5; --line-strong:#C9B7A2;
+  --accent:#B0764E; --accent-deep:#8E5C39; --accent-soft:#F4EBE2; --on-accent:#FFFFFF;
+  --second:#A8946B; --second-soft:#F2EEE2;
+  --ok:#8CA88A; --ok-bg:#F0F4EE; --ok-ink:#4E6B4C;
+  --bad:#B58585; --bad-bg:#F8EFEF; --bad-ink:#8A5252;
+  --radius:18px; --radius-sm:13px; --bw:1.5px;
+  --shadow:3px 3px 0 rgba(201,183,162,.38); --shadow-sm:2px 2px 0 rgba(201,183,162,.34);
+  --heading-weight:700; --tracking:.01em; --dot:24px;
+}
+[data-theme="warm"] body::before{
+  background-image:radial-gradient(var(--line-strong) 1px,transparent 1px);
+  background-size:var(--dot) var(--dot);opacity:.22;
+}
+[data-theme="cool"]{
+  --bg:#F4F6F9; --paper:#FFFFFF; --paper-2:#F2F5F9;
+  --ink:#2C3444; --ink-soft:#6E7789;
+  --line:#E2E7EF; --line-strong:#48546A;
+  --accent:#4F6C96; --accent-deep:#3B5378; --accent-soft:#EDF1F7; --on-accent:#FFFFFF;
+  --second:#5E8B8B; --second-soft:#EDF3F3;
+  --ok:#5F8D6A; --ok-bg:#EEF4EF; --ok-ink:#3D6B4C;
+  --bad:#A96C6C; --bad-bg:#F7EEEE; --bad-ink:#8A4B4B;
+  --radius:13px; --radius-sm:10px; --bw:1.8px;
+  --shadow:4px 4px 0 rgba(72,84,106,.26); --shadow-sm:3px 3px 0 rgba(72,84,106,.22);
+  --heading-weight:800; --tracking:-.015em; --dot:34px;
+}
+[data-theme="cool"] body::before{
+  background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+  background-size:var(--dot) var(--dot);opacity:.5;
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font-size:15px;line-height:1.7;letter-spacing:var(--tracking);
+  font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif;-webkit-font-smoothing:antialiased;
+  transition:background .25s,color .25s}
+body::before{content:"";position:fixed;inset:0;z-index:0;pointer-events:none}
+.wrap{position:relative;z-index:1;max-width:1180px;margin:0 auto;padding:22px 28px 60px}
+h1,h2,h3{font-weight:var(--heading-weight)}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:.16em;color:var(--ink-soft);text-transform:uppercase}
+[data-theme="warm"] .eyebrow{display:none}
+[hidden]{display:none !important}
+svg{flex:none}
+
+/* ===== 顶栏 ===== */
+header{display:flex;align-items:center;gap:16px;padding:12px 18px;background:var(--paper);
+  border:var(--bw) solid var(--line-strong);border-radius:var(--radius);box-shadow:var(--shadow)}
+.logo{display:flex;align-items:center;gap:10px;font-size:16.5px;font-weight:var(--heading-weight);white-space:nowrap;cursor:pointer}
+.logo-mark{width:32px;height:32px;border-radius:9px;background:var(--accent-soft);border:1.5px solid var(--accent);
+  display:grid;place-items:center}
+[data-theme="warm"] .logo-mark{transform:rotate(-4deg)}
+nav{display:flex;gap:2px}
+nav a{padding:6px 12px;border-radius:var(--radius-sm);color:var(--ink-soft);text-decoration:none;font-size:14px;cursor:pointer;white-space:nowrap}
+nav a:hover{background:var(--paper-2);color:var(--ink)}
+nav a.on{color:var(--accent-deep);background:var(--accent-soft);font-weight:600}
+.search{flex:1;min-width:120px;display:flex;align-items:center;gap:8px;padding:7px 12px;background:var(--paper-2);
+  border:1.5px solid var(--line);border-radius:var(--radius-sm);color:var(--ink-soft);font-size:14px}
+.search:focus-within{border-color:var(--accent);background:var(--paper)}
+.search input{flex:1;border:0;background:transparent;outline:none;font:inherit;color:var(--ink)}
+.theme-switch{display:flex;gap:3px;padding:3px;background:var(--paper-2);border:1.5px solid var(--line);border-radius:999px;flex:none}
+.theme-switch button{padding:4px 11px;border:0;border-radius:999px;background:transparent;font:inherit;font-size:12.5px;
+  color:var(--ink-soft);cursor:pointer;white-space:nowrap}
+.theme-switch button.on{background:var(--paper);color:var(--accent-deep);font-weight:600;border:1px solid var(--accent)}
+.avatar{width:34px;height:34px;border-radius:50%;background:var(--accent-soft);border:1.5px solid var(--accent);
+  display:grid;place-items:center;font-weight:700;font-size:13px;color:var(--accent-deep);flex:none;cursor:pointer}
+[data-theme="cool"] .avatar{border-radius:9px}
+
+/* ===== 基础组件 ===== */
+.card{background:var(--paper);border:var(--bw) solid var(--line-strong);border-radius:var(--radius);box-shadow:var(--shadow)}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:999px;border:1.5px solid var(--line);
+  background:var(--paper);font-size:13.5px;cursor:pointer;user-select:none;transition:.15s;color:var(--ink-soft)}
+[data-theme="cool"] .chip{border-radius:8px}
+.chip:hover{border-color:var(--accent);color:var(--ink)}
+.chip.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-deep);font-weight:600}
+.btn{padding:8px 16px;border-radius:var(--radius-sm);font:inherit;font-size:14px;cursor:pointer;
+  border:1.5px solid var(--line);background:var(--paper);color:var(--ink);transition:.14s}
+.btn:hover{border-color:var(--accent);color:var(--accent-deep)}
+.btn-primary{background:var(--accent);border-color:var(--accent-deep);color:var(--on-accent);font-weight:600}
+.btn-primary:hover{background:var(--accent-deep);color:var(--on-accent);transform:translate(-1px,-1px);box-shadow:var(--shadow-sm)}
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none;box-shadow:none}
+.tag{padding:2px 10px;border-radius:999px;font-size:12.5px;border:1px solid var(--line);background:var(--paper-2);color:var(--ink-soft)}
+[data-theme="cool"] .tag{border-radius:6px}
+.tag.src{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-deep)}
+.stars{color:var(--second);letter-spacing:1.5px;font-size:13px}
+.state{padding:2px 10px;border-radius:999px;font-size:12.5px;font-weight:600;flex:none;border:1px solid}
+[data-theme="cool"] .state{border-radius:6px}
+.state.ok{background:var(--ok-bg);border-color:var(--ok);color:var(--ok-ink)}
+.state.bad{background:var(--bad-bg);border-color:var(--bad);color:var(--bad-ink)}
+.state.new{background:var(--paper-2);border-color:var(--line);color:var(--ink-soft)}
+.state.wait{background:var(--second-soft);border-color:var(--second);color:var(--ink)}
+.muted{color:var(--ink-soft)}
+.sec-head{display:flex;align-items:center;gap:10px;margin:26px 2px 12px}
+.sec-head h2{font-size:16px}
+.sec-head span{font-size:13px;color:var(--ink-soft);margin-left:auto}
+
+/* ===== 筛选 ===== */
+.filters{margin:20px 0 18px;display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.filter-label{font-size:13px;color:var(--ink-soft);margin-right:2px}
+[data-theme="cool"] .filter-label{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase}
+.sep{width:1px;height:16px;background:var(--line);margin:0 6px}
+.lv-icon{width:14px;height:14px}
+.lv-icon rect{fill:currentColor}
+
+/* ===== 布局 ===== */
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 308px;gap:18px;align-items:start}
+aside{display:grid;gap:14px;position:sticky;top:22px}
+.panel{padding:17px 19px}
+.panel h3{font-size:14.5px;margin:3px 0 13px}
+
+/* ===== 作答卡 ===== */
+.solve{padding:0;overflow:hidden}
+.solve-bar{height:5px;background:var(--paper-2)}
+.solve-bar i{display:block;height:100%;background:var(--accent);opacity:.75;transition:width .3s}
+.solve-in{padding:20px 24px 18px;position:relative}
+.meta{display:flex;flex-wrap:wrap;align-items:center;gap:7px}
+.icon-btn{width:30px;height:30px;border-radius:var(--radius-sm);border:1.5px solid var(--line);background:var(--paper);
+  display:grid;place-items:center;cursor:pointer;flex:none;transition:.14s}
+.icon-btn:hover{border-color:var(--accent)}
+.icon-btn.on{background:var(--second-soft);border-color:var(--second)}
+.icon-btn.on svg{stroke:var(--second);fill:var(--second)}
+.icon-btn svg{stroke:var(--ink-soft)}
+h1.q{font-size:19.5px;line-height:1.6;margin:14px 0 0}
+.stem{font-size:15.5px;line-height:1.95;margin-top:9px}
+.stem b{color:var(--accent-deep);font-weight:700}
+
+.answer-zone{margin:18px 0 4px}
+.opts{display:grid;gap:9px}
+.opts.two-col{grid-template-columns:1fr 1fr}
+.opt{display:flex;align-items:center;gap:11px;padding:11px 14px;border:1.5px solid var(--line);
+  border-radius:var(--radius-sm);background:var(--paper);cursor:pointer;transition:.14s}
+.opt:hover{border-color:var(--accent);background:var(--paper-2)}
+.opt.on{background:var(--accent-soft);border-color:var(--accent)}
+.opt.right{background:var(--ok-bg);border-color:var(--ok)}
+.opt.wrong{background:var(--bad-bg);border-color:var(--bad)}
+.opt-key{width:26px;height:26px;flex:none;border-radius:50%;border:1.5px solid var(--line);background:var(--paper-2);
+  display:grid;place-items:center;font-weight:700;font-size:13px;color:var(--ink-soft)}
+[data-theme="cool"] .opt-key{border-radius:7px}
+.opt.on .opt-key{background:var(--accent);border-color:var(--accent-deep);color:var(--on-accent)}
+.opt.right .opt-key{background:var(--ok);border-color:var(--ok);color:#fff}
+.opt.wrong .opt-key{background:var(--bad);border-color:var(--bad);color:#fff}
+.blank-row{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+.blank-row label{font-size:14px;color:var(--ink-soft);flex:none;min-width:58px}
+.fill{padding:9px 12px;border:1.5px solid var(--line);border-radius:var(--radius-sm);background:var(--paper-2);
+  font:inherit;font-size:15px;color:var(--ink);outline:none;max-width:210px}
+.fill:focus{border-color:var(--accent);background:var(--paper)}
+.unit{font-size:14px;color:var(--ink-soft)}
+textarea.fill{max-width:none;width:100%;min-height:100px;line-height:1.8;resize:vertical}
+.bubble{margin-top:15px;display:inline-block;padding:7px 14px;font-size:13.5px;color:var(--ink-soft);
+  background:var(--paper-2);border-left:3px solid var(--second);border-radius:0 8px 8px 0}
+[data-theme="warm"] .bubble{border:1.5px dashed var(--line-strong);border-radius:14px}
+.solve-foot{display:flex;flex-wrap:wrap;align-items:center;gap:9px;margin-top:18px;padding-top:15px;border-top:1.5px solid var(--line)}
+.timer{display:flex;align-items:center;gap:7px;padding:6px 12px;border-radius:var(--radius-sm);background:var(--paper-2);
+  border:1.5px solid var(--line);color:var(--ink-soft);font-size:14px;font-variant-numeric:tabular-nums}
+.push{margin-left:auto}
+
+/* 判题结果 */
+.result{margin:16px 0 0;padding:15px 17px;border-radius:var(--radius-sm);border:1.5px solid var(--line);background:var(--paper-2)}
+.result.ok{border-color:var(--ok);background:var(--ok-bg)}
+.result.bad{border-color:var(--bad);background:var(--bad-bg)}
+.result.wait{border-color:var(--second);background:var(--second-soft)}
+.result-head{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.result-title{font-size:15.5px;font-weight:var(--heading-weight)}
+.result-score{margin-left:auto;font-size:12.5px;color:var(--ink-soft);font-variant-numeric:tabular-nums}
+.result-detail{margin-top:9px;font-size:13.5px;line-height:1.85}
+.result-detail code{padding:1px 6px;border-radius:5px;background:var(--paper);border:1px solid var(--line);font-size:12.5px}
+.result-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.explain{margin-top:13px;padding-top:13px;border-top:1.5px dashed var(--line);font-size:14.5px;line-height:1.95}
+.explain h4{font-size:14px;margin-bottom:5px}
+
+/* ===== 列表 ===== */
+.list{display:grid;gap:11px}
+.row{display:flex;align-items:center;gap:13px;padding:14px 17px;cursor:pointer;transition:.15s}
+.row:hover{transform:translate(-2px,-2px)}
+.row.active{border-color:var(--accent)}
+.row-idx{width:30px;height:30px;flex:none;border-radius:var(--radius-sm);background:var(--paper-2);
+  border:1px solid var(--line);color:var(--ink-soft);display:grid;place-items:center;font-weight:700;font-size:12.5px}
+.row-main{flex:1;min-width:0}
+.row-title{font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row-sub{font-size:12.5px;color:var(--ink-soft);margin-top:2px}
+.empty{padding:26px;text-align:center;color:var(--ink-soft);font-size:14px}
+
+/* ===== 侧栏 ===== */
+.ring-wrap{display:flex;align-items:center;gap:15px}
+.ring{width:88px;height:88px;flex:none}
+.ring circle{fill:none;stroke-width:9;stroke-linecap:round}
+.ring .bg{stroke:var(--paper-2)}
+.ring .fg{stroke:var(--accent);stroke-dasharray:283;transform:rotate(-90deg);transform-origin:50% 50%;transition:stroke-dashoffset .4s}
+.ring-num{font-size:23px;font-weight:var(--heading-weight);line-height:1.2}
+.ring-cap{font-size:12.5px;color:var(--ink-soft)}
+.mode{display:flex;gap:6px;flex-wrap:wrap}
+.hint{font-size:12.5px;color:var(--ink-soft);margin-top:10px;line-height:1.65}
+.labels{display:flex;flex-wrap:wrap;gap:7px}
+.label{display:inline-flex;align-items:center;gap:6px;padding:4px 11px;border-radius:999px;border:1.5px solid var(--line);
+  background:var(--paper-2);font-size:13px;cursor:pointer;color:var(--ink)}
+[data-theme="cool"] .label{border-radius:8px}
+.label:hover{border-color:var(--accent)}
+.label.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-deep)}
+.label b{font-size:12px;color:var(--ink-soft)}
+.label.on b{color:var(--accent-deep)}
+.label.dash{border-style:dashed;color:var(--ink-soft)}
+.rec{display:grid;gap:8px}
+.rec a{display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:var(--radius-sm);background:var(--paper-2);
+  border:1.5px solid transparent;text-decoration:none;color:var(--ink);font-size:13.5px;cursor:pointer;transition:.14s}
+.rec a:hover{border-color:var(--accent);background:var(--accent-soft)}
+.rec .dot{width:6px;height:6px;border-radius:50%;background:var(--second);flex:none}
+.rec small{margin-left:auto;color:var(--second);letter-spacing:1px;flex:none}
+
+/* ===== 主页 ===== */
+.hero{padding:34px 36px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:26px;align-items:center}
+.hero h1{font-size:27px;line-height:1.45}
+.hero p{margin-top:10px;font-size:15px;color:var(--ink-soft);max-width:520px}
+.hero-actions{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap}
+.hero-art{width:190px;height:150px}
+.home-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-top:18px}
+.feature{padding:18px 20px}
+.feature h3{font-size:15px;margin-bottom:6px}
+.feature p{font-size:13.5px;color:var(--ink-soft);line-height:1.8}
+.feature-ico{width:34px;height:34px;border-radius:10px;background:var(--paper-2);border:1px solid var(--line);
+  display:grid;place-items:center;margin-bottom:11px}
+.continue{padding:20px 24px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.continue-main{flex:1;min-width:220px}
+
+/* ===== 个人主页 ===== */
+.profile-head{padding:24px 26px;display:flex;gap:20px;align-items:center;flex-wrap:wrap}
+.avatar-lg{width:74px;height:74px;border-radius:50%;background:var(--accent-soft);border:var(--bw) solid var(--accent);
+  display:grid;place-items:center;font-size:26px;font-weight:700;color:var(--accent-deep);flex:none}
+[data-theme="cool"] .avatar-lg{border-radius:16px}
+.profile-info{flex:1;min-width:200px}
+.profile-info h2{font-size:20px}
+.profile-bio{font-size:13.5px;color:var(--ink-soft);margin-top:4px}
+.social{display:flex;gap:18px;margin-top:12px}
+.social button{border:0;background:transparent;font:inherit;cursor:pointer;text-align:left;padding:0;color:var(--ink)}
+.social b{font-size:17px;font-weight:var(--heading-weight);display:block;line-height:1.3}
+.social span{font-size:12.5px;color:var(--ink-soft)}
+.social button:hover b{color:var(--accent-deep)}
+.profile-grid{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:18px;align-items:start;margin-top:18px}
+.radar-card{padding:18px 20px}
+.radar{width:100%;height:auto;display:block}
+.radar-legend{display:grid;gap:7px;margin-top:8px}
+.legend-row{display:flex;align-items:center;gap:9px;font-size:13px}
+.legend-bar{flex:1;height:6px;border-radius:99px;background:var(--paper-2);overflow:hidden}
+.legend-bar i{display:block;height:100%;background:var(--accent);opacity:.7}
+.legend-val{font-size:12.5px;color:var(--ink-soft);font-variant-numeric:tabular-nums;min-width:34px;text-align:right}
+.user-row{display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line)}
+.user-row:last-child{border-bottom:0}
+.user-row .avatar{cursor:default}
+.user-row .um{flex:1;min-width:0}
+.user-row .un{font-size:14.5px;font-weight:600}
+.user-row .ub{font-size:12.5px;color:var(--ink-soft)}
+
+/* ===== 资料 ===== */
+.mat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(258px,1fr));gap:13px}
+.mat{padding:17px 19px;display:flex;flex-direction:column;gap:8px}
+.mat-title{font-size:15px;font-weight:600;line-height:1.55}
+.mat-meta{font-size:12.5px;color:var(--ink-soft)}
+.mat-foot{display:flex;align-items:center;gap:8px;margin-top:4px}
+
+/* ===== 题解抽屉 ===== */
+#drawerMask{position:fixed;inset:0;z-index:54;background:rgba(44,52,68,.28);opacity:0;pointer-events:none;transition:.25s}
+#drawerMask.open{opacity:1;pointer-events:auto}
+#drawer{position:fixed;top:0;right:0;bottom:0;width:min(540px,100%);z-index:55;background:var(--bg);
+  border-left:var(--bw) solid var(--line-strong);transform:translateX(102%);transition:transform .28s ease;
+  overflow-y:auto;padding:22px 24px 40px}
+#drawer.open{transform:none}
+.drawer-head{display:flex;align-items:flex-start;gap:12px;margin-bottom:6px}
+.drawer-head h2{font-size:18px;flex:1}
+.drawer-sub{font-size:13px;color:var(--ink-soft);margin-bottom:16px}
+.sol{padding:16px 18px;margin-bottom:11px}
+.sol-head{display:flex;align-items:center;gap:10px}
+.sol-avatar{width:30px;height:30px;border-radius:50%;background:var(--paper-2);border:1px solid var(--line);
+  display:grid;place-items:center;font-size:12.5px;font-weight:700;color:var(--ink-soft);flex:none}
+.sol-body{margin:9px 0 11px;font-size:14.5px;line-height:1.9}
+.sol-foot{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.mini{display:inline-flex;align-items:center;gap:5px;padding:4px 11px;border-radius:999px;border:1px solid var(--line);
+  background:var(--paper-2);font-size:13px;cursor:pointer;transition:.14s;color:var(--ink-soft)}
+[data-theme="cool"] .mini{border-radius:7px}
+.mini:hover{border-color:var(--accent);color:var(--ink)}
+.mini.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-deep);font-weight:600}
+.comments{margin-top:11px;padding-top:11px;border-top:1px dashed var(--line);display:grid;gap:9px}
+.comment{display:flex;gap:9px;font-size:13.5px}
+.comment b{flex:none;color:var(--ink-soft);font-weight:600}
+
+/* ===== 统计 ===== */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(146px,1fr));gap:13px;margin-bottom:6px}
+.stat{padding:15px 17px}
+.stat-num{font-size:25px;font-weight:var(--heading-weight);line-height:1.25}
+.stat-cap{font-size:13px;color:var(--ink-soft)}
+
+/* ===== Toast / Modal ===== */
+#toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(18px);z-index:70;
+  padding:10px 19px;border-radius:999px;background:var(--ink);color:var(--bg);font-size:13.5px;
+  opacity:0;pointer-events:none;transition:.24s;max-width:88vw;text-align:center}
+#toast.show{opacity:.95;transform:translateX(-50%) translateY(0)}
+#mask{position:fixed;inset:0;z-index:60;background:rgba(44,52,68,.3);display:grid;place-items:center;padding:20px}
+.modal{width:min(430px,100%);max-height:86vh;overflow-y:auto;padding:22px 24px;background:var(--paper);
+  border:var(--bw) solid var(--line-strong);border-radius:var(--radius);box-shadow:var(--shadow)}
+.modal h3{font-size:16px;margin-bottom:5px}
+.modal p{font-size:13.5px;color:var(--ink-soft);margin-bottom:14px}
+.modal-foot{display:flex;gap:10px;margin-top:18px}
+.modal-foot .btn{flex:1}
+.field{margin-bottom:12px}
+.field label{display:block;font-size:13px;color:var(--ink-soft);margin-bottom:5px}
+.field input{width:100%;max-width:none;padding:10px 12px;border:1.5px solid var(--line);border-radius:var(--radius-sm);
+  background:var(--paper-2);font:inherit;font-size:15px;color:var(--ink);outline:none}
+.field input:focus{border-color:var(--accent);background:var(--paper)}
+.radio-list{display:grid;gap:8px}
+.radio{display:flex;align-items:center;gap:10px;padding:10px 13px;border:1.5px solid var(--line);
+  border-radius:var(--radius-sm);background:var(--paper-2);font-size:14px;cursor:pointer}
+.radio:hover{border-color:var(--accent)}
+.radio.on{background:var(--accent-soft);border-color:var(--accent)}
+.radio i{width:15px;height:15px;border-radius:50%;border:1.5px solid var(--line-strong);flex:none}
+.radio.on i{background:var(--accent);border-color:var(--accent-deep);box-shadow:inset 0 0 0 3px var(--paper)}
+.divider-text{display:flex;align-items:center;gap:10px;margin:16px 0;color:var(--ink-soft);font-size:12.5px}
+.divider-text::before,.divider-text::after{content:"";flex:1;height:1px;background:var(--line)}
+footer{margin-top:32px;text-align:center;font-size:12.5px;color:var(--ink-soft)}
+@media(max-width:980px){.grid,.profile-grid{grid-template-columns:1fr}aside{position:static}
+  .opts.two-col{grid-template-columns:1fr}.hero{grid-template-columns:1fr}.hero-art{display:none}}
+</style>
+</head>
+<body data-theme="cool">
+<div class="wrap">
+
+  <header>
+    <div class="logo" id="logoHome">
+      <span class="logo-mark">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" style="stroke:var(--accent-deep)">
+          <path d="M5 7h14M5 12h8M5 17h11"/>
+        </svg>
+      </span>
+      mathematics
+    </div>
+    <nav id="nav">
+      <a data-view="home">主页</a>
+      <a data-view="problems" class="on">题库</a>
+      <a data-view="materials">真题讲义</a>
+      <a data-view="me">我的练习</a>
+    </nav>
+    <label class="search">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+        <circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>
+      </svg>
+      <input id="kw" placeholder="搜索题目、知识点或赛事名">
+    </label>
+    <div class="theme-switch" id="themeSwitch">
+      <button data-theme-btn="warm">温暖柔和</button>
+      <button data-theme-btn="cool" class="on">炫酷高级</button>
+    </div>
+    <button class="btn" id="btnLogin">登录</button>
+    <div class="avatar" id="avatar" hidden>小</div>
+  </header>
+
+  <!-- ============ 主页 ============ -->
+  <div id="view-home" hidden></div>
+
+  <!-- ============ 题库 ============ -->
+  <div id="view-problems">
+    <div class="filters" id="filters">
+      <span class="filter-label">题型</span>
+      <span class="chip on" data-f="type" data-v="SINGLE">单选</span>
+      <span class="chip on" data-f="type" data-v="MULTI">多选</span>
+      <span class="chip on" data-f="type" data-v="NUMERIC">填空</span>
+      <span class="chip on" data-f="type" data-v="BLANK">多空</span>
+      <span class="chip on" data-f="type" data-v="JUDGE">判断</span>
+      <span class="chip on" data-f="type" data-v="PROOF">过程题</span>
+      <span class="sep"></span>
+      <span class="filter-label">难度</span>
+      <span class="chip" data-f="level" data-v="2">
+        <svg class="lv-icon" viewBox="0 0 16 16"><rect x="1" y="9" width="3.6" height="6" rx="1.2"/><rect x="6.2" y="9" width="3.6" height="6" rx="1.2" opacity=".2"/><rect x="11.4" y="9" width="3.6" height="6" rx="1.2" opacity=".2"/></svg>入门</span>
+      <span class="chip" data-f="level" data-v="3">
+        <svg class="lv-icon" viewBox="0 0 16 16"><rect x="1" y="9" width="3.6" height="6" rx="1.2"/><rect x="6.2" y="5.5" width="3.6" height="9.5" rx="1.2"/><rect x="11.4" y="5.5" width="3.6" height="9.5" rx="1.2" opacity=".2"/></svg>进阶</span>
+      <span class="chip" data-f="level" data-v="4">
+        <svg class="lv-icon" viewBox="0 0 16 16"><rect x="1" y="9" width="3.6" height="6" rx="1.2"/><rect x="6.2" y="5.5" width="3.6" height="9.5" rx="1.2"/><rect x="11.4" y="2" width="3.6" height="13" rx="1.2"/></svg>挑战</span>
+    </div>
+
+    <div class="grid">
+      <main>
+        <section class="card solve">
+          <div class="solve-bar"><i id="bar" style="width:16%"></i></div>
+          <div class="solve-in">
+            <div class="meta" id="meta"></div>
+            <h1 class="q" id="qTitle"></h1>
+            <p class="stem" id="qStem"></p>
+            <div class="answer-zone" id="answerZone"></div>
+            <div class="bubble" id="bubble">解析和题解随时可看，建议先自己推一遍</div>
+            <div id="resultBox"></div>
+            <div class="solve-foot">
+              <span class="timer" id="timer">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+                  <circle cx="12" cy="13" r="8"/><path d="M12 9.5V13l2.5 1.5M9 2h6"/>
+                </svg>
+                <span id="clock">00:00</span>
+              </span>
+              <button class="btn" id="btnExplain">查看解析</button>
+              <button class="btn" id="btnSolutions">题解</button>
+              <button class="btn" id="btnLabel">加入分类</button>
+              <button class="btn" id="btnReport">反馈</button>
+              <button class="btn btn-primary push" id="btnSubmit">提交答案</button>
+            </div>
+          </div>
+        </section>
+
+        <div class="sec-head"><h2>题目列表</h2><span id="listCount"></span></div>
+        <div class="list" id="list"></div>
+      </main>
+
+      <aside>
+        <section class="card panel">
+          <div class="eyebrow">Today</div>
+          <h3>今日练习</h3>
+          <div class="ring-wrap">
+            <svg class="ring" viewBox="0 0 100 100">
+              <circle class="bg" cx="50" cy="50" r="45"/>
+              <circle class="fg" id="ring" cx="50" cy="50" r="45" stroke-dashoffset="283"/>
+            </svg>
+            <div>
+              <div class="ring-num"><span id="doneNum">0</span> / 20</div>
+              <div class="ring-cap">正确率 <span id="rate">—</span><br>连续练习 6 天</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card panel">
+          <div class="eyebrow">Timer</div>
+          <h3>计时方式</h3>
+          <div class="mode" id="mode">
+            <span class="chip" data-mode="NONE">不计时</span>
+            <span class="chip on" data-mode="PER_PROBLEM">单题计时</span>
+            <span class="chip" data-mode="WHOLE_PAPER">整套计时</span>
+          </div>
+          <p class="hint" id="modeHint">单题计时：每换一道题重新计时，只作记录，不影响判分。</p>
+          <button class="btn" id="btnFinish" hidden style="margin-top:11px;width:100%">交卷并结算</button>
+        </section>
+
+        <section class="card panel">
+          <div class="eyebrow">Labels</div>
+          <h3>我的分类</h3>
+          <div class="labels" id="labelList"></div>
+        </section>
+
+        <section class="card panel">
+          <div class="eyebrow">Similar</div>
+          <h3>相似题推荐</h3>
+          <div class="rec" id="recList"></div>
+        </section>
+      </aside>
+    </div>
+  </div>
+
+  <!-- ============ 真题讲义 ============ -->
+  <div id="view-materials" hidden>
+    <div class="filters">
+      <span class="filter-label">类型</span>
+      <span class="chip on">真题试卷</span>
+      <span class="chip on">讲义</span>
+      <span class="sep"></span>
+      <span class="filter-label">年份</span>
+      <span class="chip on">2023</span>
+      <span class="chip">2022</span>
+      <span class="chip">2021</span>
+    </div>
+    <div class="mat-grid" id="matGrid"></div>
+  </div>
+
+  <!-- ============ 我的练习 ============ -->
+  <div id="view-me" hidden>
+    <div class="stat-grid">
+      <section class="card stat"><div class="stat-num" id="meDone">0</div><div class="stat-cap">今日已练</div></section>
+      <section class="card stat"><div class="stat-num" id="meRate">—</div><div class="stat-cap">正确率</div></section>
+      <section class="card stat"><div class="stat-num" id="meWrong">0</div><div class="stat-cap">错题待复习</div></section>
+      <section class="card stat"><div class="stat-num">6</div><div class="stat-cap">连续练习天数</div></section>
+    </div>
+
+    <div class="sec-head"><h2>我的题目</h2><span id="meCount"></span></div>
+    <div class="filters" id="meFilters" style="margin-top:0">
+      <span class="filter-label">加入时间</span>
+      <span class="chip on" data-mf="time" data-v="ALL">全部</span>
+      <span class="chip" data-mf="time" data-v="TODAY">今天</span>
+      <span class="chip" data-mf="time" data-v="WEEK">最近 7 天</span>
+      <span class="sep"></span>
+      <span class="filter-label">来源</span>
+      <span class="chip on" data-mf="kind" data-v="WRONG">错题</span>
+      <span class="chip" data-mf="kind" data-v="FAV">收藏</span>
+      <span class="chip" data-mf="kind" data-v="LABEL">我的分类</span>
+      <span class="sep"></span>
+      <span class="filter-label">标签</span>
+      <span class="chip on" data-mf="tag" data-v="ALL">不限</span>
+      <span class="chip" data-mf="tag" data-v="行程问题">行程问题</span>
+      <span class="chip" data-mf="tag" data-v="数论">数论</span>
+      <span class="chip" data-mf="tag" data-v="平面几何">平面几何</span>
+      <span class="chip" data-mf="tag" data-v="数的整除">数的整除</span>
+    </div>
+    <div class="list" id="meList"></div>
+
+    <div class="sec-head"><h2>练习记录</h2><span>整套计时的会话会记录总耗时</span></div>
+    <div class="list" id="sessionList"></div>
+  </div>
+
+  <!-- ============ 个人主页 ============ -->
+  <div id="view-profile" hidden></div>
+
+  <footer>界面原型 · 低饱和配色，强调色只用于主操作 · 判题为前端演示，真实实现在服务端</footer>
+</div>
+
+<div id="toast"></div>
+<div id="mask" hidden></div>
+<div id="drawerMask"></div>
+<aside id="drawer"></aside>
+
+<script>
+/* ========================= 数据 ========================= */
+const problems = [
+  {
+    id:1, version:1, type:'SINGLE', level:3, title:'相遇问题 · 中途休息',
+    src:'2023 华罗庚金杯 · 初赛', tag:'行程问题', grade:'六年级',
+    stem:'甲、乙两人分别从相距 <b>56 千米</b> 的 A、B 两地同时出发相向而行，甲每小时行 <b>8 千米</b>，乙每小时行 <b>7 千米</b>。若甲出发 1 小时后休息了 30 分钟再继续前进，两人从出发到相遇一共需要多少小时？',
+    options:['3.6 小时','4 小时','4.2 小时','4.5 小时'],
+    answer:{choice:'B'},
+    explain:'设从出发到相遇共 t 小时。乙全程未停，行 7t 千米；甲休息 0.5 小时，实际行走 (t − 0.5) 小时，行 8(t − 0.5) 千米。<br>列方程：8(t − 0.5) + 7t = 56 → 15t − 4 = 56 → t = 4。<br>所以两人从出发到相遇共需 <b>4 小时</b>。'
+  },
+  {
+    id:2, version:1, type:'NUMERIC', level:4, title:'被 7 整除且数字和为 12',
+    src:'2022 迎春杯 · 复赛', tag:'数论', grade:'六年级',
+    stem:'在所有三位数中，既能被 <b>7</b> 整除、各位数字之和又等于 <b>12</b> 的数共有多少个？',
+    unit:'个', answer:{value:9, tolerance:0},
+    explain:'满足条件的数依次为 147、273、336、462、525、651、714、840、903，共 <b>9 个</b>。<br>相邻两数之差在 126 与 63 之间交替，可用这个规律快速枚举验证。'
+  },
+  {
+    id:3, version:1, type:'MULTI', level:2, title:'既是 3 的倍数又是 4 的倍数',
+    src:'原创题', tag:'数的整除', grade:'六年级',
+    stem:'下列各数中，既是 3 的倍数又是 4 的倍数的有哪些？（多选）',
+    options:['108','124','132','150'],
+    answer:{choices:['A','C']},
+    explain:'判断 3 的倍数看各位数字之和，判断 4 的倍数看末两位。<br>108：1+0+8=9 是 3 的倍数，08÷4=2，成立。<br>124：1+2+4=7 不是 3 的倍数。<br>132：1+3+2=6 成立，32÷4=8 成立。<br>150：50÷4 除不尽。<br>答案为 <b>A、C</b>。'
+  },
+  {
+    id:4, version:1, type:'JUDGE', level:2, title:'内角比 1:2:3 的三角形',
+    src:'原创题', tag:'平面几何', grade:'六年级',
+    stem:'一个三角形三个内角度数满足 \\(\\alpha:\\beta:\\gamma=1:2:3\\)，那么这个三角形一定是直角三角形。这句话对吗？',
+    answer:{value:true},
+    explain:'三角形内角和为 180°，按 1:2:3 分配得 30°、60°、90°。<br>最大角恰为 90°，所以一定是直角三角形，判断 <b>正确</b>。'
+  },
+  {
+    id:5, version:1, type:'BLANK', level:3, title:'正方形中的两个三角形',
+    src:'原创题', tag:'平面几何', grade:'六年级',
+    stem:'正方形 ABCD 的边长为 <b>8</b>，E 是边 BC 的中点，连接 AE、DE。请分别求出两个三角形的面积。<svg role="img" aria-label="正方形 ABCD，E 是 BC 中点，连接 AE 和 DE" viewBox="0 0 260 180" style="display:block;width:min(100%,360px);height:auto;margin:16px auto"><rect x="50" y="20" width="140" height="140" fill="none" stroke="currentColor" stroke-width="2"/><path d="M50 20L190 90L50 160" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="190" cy="90" r="3" fill="currentColor"/><g font-size="14" fill="currentColor"><text x="34" y="20">A</text><text x="197" y="23">B</text><text x="197" y="165">C</text><text x="34" y="165">D</text><text x="198" y="95">E</text></g></svg>',
+    blanks:[{key:'1',label:'△ABE ='},{key:'2',label:'△ADE ='}],
+    answer:{blanks:{'1':16,'2':32}, orderIndependent:false},
+    explain:'E 为 BC 中点，故 BE = 4。<br>△ABE：以 AB = 8 为高、BE = 4 为底，面积 = 8 × 4 ÷ 2 = <b>16</b>。<br>△ADE：以 AD = 8 为底，E 到 AD 的距离即 AB = 8，面积 = 8 × 8 ÷ 2 = <b>32</b>。<br>验算：16 + 32 + △DCE(16) = 64 = 正方形面积。'
+  },
+  {
+    id:6, version:1, type:'PROOF', level:4, title:'连续 5 个整数中必有 5 的倍数',
+    src:'原创题', tag:'数论', grade:'初一',
+    stem:'请说明：任意 <b>5</b> 个连续整数中，一定有一个能被 5 整除。',
+    answer:{}, explain:'把整数按除以 5 的余数分成 0、1、2、3、4 五类。<br>连续 5 个整数除以 5 的余数两两不同，恰好取遍这 5 个余数，因此其中必有一个余数为 0，即能被 5 整除。'
+  }
+];
+
+/* 每题的题解，点"题解"按钮从右侧抽屉打开 */
+const solutionsByProblem = {
+  1:[
+    {a:'林', n:'林小满', l:42, b:'先把甲的休息折算成路程差：甲少走了 0.5 × 8 = 4 千米。于是把总路程看成 56 + 4 = 60 千米由两人按 15 千米/小时合走，60 ÷ 15 = 4 小时。不用列方程也能算。',
+     c:[['陈同学','这个转化太妙了，比列方程快'],['王老师','本质是把"停走"变成"全程走 + 补差"，小学阶段推荐这个思路']]},
+    {a:'周', n:'周予安', l:18, b:'标准解法：设总时间 t，甲行走时间为 t − 0.5。8(t − 0.5) + 7t = 56，解得 t = 4。列方程更稳妥，适合考试求稳。',
+     c:[['李同学','我就是漏了减 0.5，结果算成 3.73']]},
+    {a:'吴', n:'吴思远', l:7, b:'画线段图更直观：第 1 小时两人共走 15 千米，甲休息的半小时里乙独走 3.5 千米，剩下 37.5 千米两人合走，37.5 ÷ 15 = 2.5，合计 4 小时。', c:[]}
+  ],
+  2:[
+    {a:'周', n:'周予安', l:31, b:'不必枚举 128 个三位数。数字和为 12 说明模 9 余 3，再结合被 7 整除，用中国剩余定理可把候选压到 9 个，逐一验证即可。',
+     c:[['陈同学','小学阶段直接按 63/126 交替找更快']]},
+    {a:'孙', n:'孙一诺', l:12, b:'从最小的 147 开始，交替加 126 和 63，一直加到超过 999 为止，得到的就是全部 9 个数。', c:[]}
+  ],
+  3:[{a:'林', n:'林小满', l:9, b:'既是 3 的倍数又是 4 的倍数，等价于是 12 的倍数。直接用 12 去除更省事：108 ÷ 12 = 9，132 ÷ 12 = 11，都是整数。', c:[]}],
+  4:[{a:'吴', n:'吴思远', l:6, b:'按份数算：总共 1+2+3 = 6 份，180° ÷ 6 = 30°，最大角占 3 份就是 90°。', c:[]}],
+  5:[{a:'孙', n:'孙一诺', l:14, b:'整体看更快：△ABE 与 △DCE 都是 8 × 4 ÷ 2 = 16，正方形面积 64 减去两块 16，剩下的 32 就是 △ADE。', c:[['李同学','这样连高都不用找']]}],
+  6:[{a:'周', n:'周予安', l:21, b:'用抽屉原理表述更严谨：5 个连续整数除以 5 的余数互不相同，而余数只有 5 种取值，因此每种余数恰好出现一次，其中包括余数 0。', c:[]}]
+};
+
+const materials = [
+  {t:'2023 华罗庚金杯少年数学邀请赛 · 初赛试卷', m:'已获书面授权 · 真题试卷 · 六年级 · PDF 4.2 MB', n:1286},
+  {t:'2023 迎春杯数学花园探秘 · 复赛试卷', m:'已获书面授权 · 真题试卷 · 六年级 · PDF 3.6 MB', n:964},
+  {t:'行程问题专题讲义：相遇、追及与多次往返', m:'平台自编 · 讲义 · 六年级 · PDF 12.8 MB', n:2153},
+  {t:'数论入门讲义：整除、余数与同余初步', m:'平台自编 · 讲义 · 初一 · PDF 9.4 MB', n:1771}
+];
+
+let labels = [
+  {name:'行程问题', n:8, on:false},
+  {name:'数论', n:5, on:false},
+  {name:'考前再看', n:3, on:false},
+  {name:'易错几何', n:2, on:false}
+];
+
+const radarData = [
+  {k:'行程问题', v:.82}, {k:'数论', v:.64}, {k:'平面几何', v:.45},
+  {k:'组合计数', v:.58}, {k:'计算与估算', v:.90}, {k:'应用题', v:.70}
+];
+
+const following = [
+  {a:'林', n:'林小满', b:'六年级 · 华杯赛冲刺 · 题解 32 篇', f:true},
+  {a:'周', n:'周予安', b:'初一 · 数论爱好者 · 题解 18 篇', f:true},
+  {a:'吴', n:'吴思远', b:'六年级 · 几何专项 · 题解 9 篇', f:true}
+];
+const followers = [
+  {a:'陈', n:'陈知行', b:'五年级 · 刚开始刷题', f:false},
+  {a:'李', n:'李念安', b:'六年级 · 错题本 46 道', f:true},
+  {a:'孙', n:'孙一诺', b:'初一 · 连续练习 21 天', f:false},
+  {a:'赵', n:'赵明哲', b:'六年级 · 迎春杯备考', f:false}
+];
+
+/* ========================= 状态 ========================= */
+const S = {
+  view:'problems', user:null, current:1, answers:{}, results:{}, favs:{},
+  timerMode:'PER_PROBLEM', seconds:0, tick:null,
+  done:0, correct:0, wrong:[], wrongItems:{}, attempts:{}, attemptKeys:{}, sessions:[], likes:{},
+  filter:{type:new Set(['SINGLE','MULTI','NUMERIC','BLANK','JUDGE','PROOF']), level:new Set()},
+  meFilter:{time:'ALL', kind:'WRONG', tag:'ALL'},
+  kw:''
+};
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const cur = () => problems.find(p => p.id === S.current);
+const KEYS = ['A','B','C','D','E'];
+const TYPE_NAME = {SINGLE:'单选',MULTI:'多选',NUMERIC:'填空',BLANK:'多空填空',JUDGE:'判断',PROOF:'过程题'};
+const LEVEL_NAME = {2:'入门',3:'进阶',4:'挑战'};
+const MASTERY_THRESHOLD = 2;
+const newAttemptKey = () => crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
+function typeset(root){
+  if (window.renderMathInElement) renderMathInElement(root || document.body, {
+    delimiters:[{left:'\\(',right:'\\)',display:false},{left:'\\[',right:'\\]',display:true}],
+    throwOnError:false
+  });
+}
+
+/* ========================= 主题 ========================= */
+$$('#themeSwitch button').forEach(b => b.onclick = () => {
+  $$('#themeSwitch button').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.body.dataset.theme = b.dataset.themeBtn;
+  localStorage.setItem('olym-theme', b.dataset.themeBtn);
+  if (S.view === 'profile') renderProfile();
+});
+const savedTheme = localStorage.getItem('olym-theme');
+if (savedTheme){
+  document.body.dataset.theme = savedTheme;
+  $$('#themeSwitch button').forEach(x => x.classList.toggle('on', x.dataset.themeBtn === savedTheme));
+}
+
+/* ========================= 视图切换 ========================= */
+const VIEWS = ['home','problems','materials','me','profile'];
+function go(view){
+  S.view = view;
+  VIEWS.forEach(v => $('#view-' + v).hidden = v !== view);
+  $$('#nav a').forEach(a => a.classList.toggle('on', a.dataset.view === view));
+  if (view === 'home') renderHome();
+  if (view === 'me') renderMe();
+  if (view === 'profile') renderProfile();
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+$$('#nav a').forEach(a => a.onclick = () => go(a.dataset.view));
+$('#logoHome').onclick = () => go('home');
+$('#avatar').onclick = () => go('profile');
+
+/* ========================= 登录 ========================= */
+$('#btnLogin').onclick = () => openLogin();
+function openLogin(){
+  openModal(`
+    <h3>登录 mathematics</h3>
+    <p>登录后可以作答、收藏、下载资料和关注他人</p>
+    <div class="field"><label>邮箱或手机号</label><input id="loginAcc" value="xiaoman@example.com"></div>
+    <div class="field"><label>密码</label><input id="loginPwd" type="password" value="123456"></div>
+    <div class="divider-text">其他方式</div>
+    <button class="btn" style="width:100%" id="wxLogin">微信扫码登录（需企业资质，暂未开放）</button>
+    <div class="modal-foot">
+      <button class="btn" data-close>取消</button>
+      <button class="btn btn-primary" id="doLogin">登录</button>
+    </div>`);
+  $('#wxLogin').onclick = () => toast('微信开放平台网站应用需要企业主体认证，资质到位前入口保持关闭');
+  $('#doLogin').onclick = () => {
+    S.user = {name:'小满', short:'小', bio:'六年级 · 目标华杯赛复赛 · 每天 20 题', following:following.length, followers:followers.length};
+    closeModal();
+    syncAuth();
+    toast('欢迎回来，小满');
+    go('home');
+  };
+}
+function syncAuth(){
+  $('#btnLogin').hidden = !!S.user;
+  $('#avatar').hidden = !S.user;
+  if (S.user) $('#avatar').textContent = S.user.short;
+}
+
+/* ========================= 主页 ========================= */
+function renderHome(){
+  const el = $('#view-home');
+  if (!S.user){
+    el.innerHTML = `
+      <section class="card hero">
+        <div>
+          <h1>把每天 20 道题，变成能看见的进步</h1>
+          <p>按知识点筛题、即时判分、错题自动归档，真题试卷和讲义可以直接下载。界面刻意保持安静，把注意力留给题目本身。</p>
+          <div class="hero-actions">
+            <button class="btn btn-primary" id="heroStart">开始刷题</button>
+            <button class="btn" id="heroLogin">登录 / 注册</button>
+            <button class="btn" id="heroMat">看看真题讲义</button>
+          </div>
+        </div>
+        <svg class="hero-art" viewBox="0 0 190 150" fill="none">
+          <rect x="14" y="20" width="118" height="112" rx="10" style="fill:var(--paper-2);stroke:var(--line-strong)" stroke-width="1.6"/>
+          <rect x="30" y="38" width="70" height="7" rx="3.5" style="fill:var(--line)"/>
+          <rect x="30" y="54" width="86" height="7" rx="3.5" style="fill:var(--line)"/>
+          <rect x="30" y="76" width="50" height="16" rx="6" style="fill:var(--accent-soft);stroke:var(--accent)" stroke-width="1.4"/>
+          <rect x="30" y="100" width="50" height="16" rx="6" style="fill:var(--paper);stroke:var(--line)" stroke-width="1.4"/>
+          <circle cx="146" cy="52" r="26" style="fill:var(--paper);stroke:var(--line-strong)" stroke-width="1.6"/>
+          <path d="M146 52 L146 30 A22 22 0 0 1 165 63 Z" style="fill:var(--accent)" opacity=".5"/>
+          <path d="M120 112 l12 12 l24 -28" style="stroke:var(--ok)" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </section>
+      <div class="home-grid">
+        ${[['即时判分','客观题提交后立刻给对错和得分，多空题按空给分，过程题转人工批改。'],
+           ['解析随时看','不要求先提交，想不通可以直接看思路，再回头重做。'],
+           ['错题自动归档','做错的题自动进错题本，可以按加入时间和知识点分类复习。']]
+          .map(([h,p]) => `<section class="card feature">
+            <div class="feature-ico"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" style="stroke:var(--accent)"><path d="M5 12l4.5 4.5L19 7"/></svg></div>
+            <h3>${h}</h3><p>${p}</p></section>`).join('')}
+      </div>`;
+    $('#heroStart').onclick = () => go('problems');
+    $('#heroLogin').onclick = openLogin;
+    $('#heroMat').onclick = () => go('materials');
+    return;
+  }
+  const p = cur();
+  el.innerHTML = `
+    <section class="card continue">
+      <div class="continue-main">
+        <div class="eyebrow">Continue</div>
+        <h2 style="font-size:19px;margin-top:2px">继续练习：${p.title}</h2>
+        <p class="muted" style="font-size:13.5px;margin-top:4px">${p.tag} · ${p.src} · ${TYPE_NAME[p.type]} · ${LEVEL_NAME[p.level]}</p>
+      </div>
+      <button class="btn btn-primary" id="homeGo">回到这道题</button>
+    </section>
+    <div class="stat-grid" style="margin-top:16px">
+      <section class="card stat"><div class="stat-num">${S.done}</div><div class="stat-cap">今日已练</div></section>
+      <section class="card stat"><div class="stat-num">${S.done ? Math.round(S.correct/S.done*100)+'%' : '—'}</div><div class="stat-cap">正确率</div></section>
+      <section class="card stat"><div class="stat-num">${S.wrong.length}</div><div class="stat-cap">错题待复习</div></section>
+      <section class="card stat"><div class="stat-num">${S.user.followers}</div><div class="stat-cap">粉丝</div></section>
+    </div>
+    <div class="sec-head"><h2>今天推荐</h2><span>按你的薄弱知识点排序</span></div>
+    <div class="list">
+      ${problems.slice(0,3).map(x => `<article class="card row" data-go="${x.id}">
+        <span class="row-idx">${LEVEL_NAME[x.level][0]}</span>
+        <div class="row-main"><div class="row-title">${x.title}</div>
+        <div class="row-sub">${x.tag} · ${x.src} · ${TYPE_NAME[x.type]}</div></div>
+        <span class="state new">去做</span></article>`).join('')}
+    </div>
+    <div class="sec-head"><h2>我关注的人</h2><span>最近发布了新题解</span></div>
+    <div class="card">
+      ${following.map(u => `<div class="user-row">
+        <span class="avatar">${u.a}</span>
+        <div class="um"><div class="un">${u.n}</div><div class="ub">${u.b}</div></div>
+        <span class="state ok">已关注</span></div>`).join('')}
+    </div>`;
+  $('#homeGo').onclick = () => go('problems');
+  $$('#view-home [data-go]').forEach(r => r.onclick = () => { S.current = Number(r.dataset.go); renderProblem(); go('problems'); });
+}
+
+/* ========================= 个人主页 ========================= */
+function renderProfile(){
+  const el = $('#view-profile');
+  const u = S.user;
+  if (!u){ el.innerHTML = `<section class="card empty">登录后可以查看个人主页、关注和刷题分布</section>`; return; }
+  el.innerHTML = `
+    <section class="card profile-head">
+      <span class="avatar-lg">${u.short}</span>
+      <div class="profile-info">
+        <h2>${u.name}</h2>
+        <div class="profile-bio">${u.bio}</div>
+        <div class="social">
+          <button id="goFollowing"><b>${u.following}</b><span>关注</span></button>
+          <button id="goFollowers"><b>${u.followers}</b><span>粉丝</span></button>
+          <button><b>${S.done}</b><span>今日作答</span></button>
+          <button><b>${S.wrong.length}</b><span>错题</span></button>
+        </div>
+      </div>
+      <button class="btn" id="btnLogout">退出登录</button>
+    </section>
+    <div class="profile-grid">
+      <section class="card radar-card">
+        <div class="eyebrow">Distribution</div>
+        <h3 style="font-size:15px;margin:3px 0 4px">刷题分布</h3>
+        <p class="muted" style="font-size:13px;margin-bottom:6px">按知识点统计最近 30 天的正确率，越靠外掌握越好</p>
+        <svg class="radar" id="radar" viewBox="0 0 360 300"></svg>
+        <div class="radar-legend" id="radarLegend"></div>
+      </section>
+      <div style="display:grid;gap:14px">
+        <section class="card panel">
+          <div class="eyebrow">Recent</div>
+          <h3>最近作答</h3>
+          <div class="rec">
+            ${(Object.keys(S.results).length ? Object.keys(S.results) : [1,2,3]).slice(0,4).map(id => {
+              const p = problems.find(x => x.id === Number(id));
+              const r = S.results[id];
+              return `<a><span class="dot"></span>${p.title}<small>${r ? r.score + '分' : '未作答'}</small></a>`;
+            }).join('')}
+          </div>
+        </section>
+        <section class="card panel">
+          <div class="eyebrow">Labels</div>
+          <h3>我的分类</h3>
+          <div class="labels">${labels.map(l => `<span class="label">${l.name} <b>${l.n}</b></span>`).join('')}</div>
+        </section>
+      </div>
+    </div>`;
+  drawRadar();
+  $('#goFollowing').onclick = () => openUserList('following');
+  $('#goFollowers').onclick = () => openUserList('followers');
+  $('#btnLogout').onclick = () => { S.user = null; syncAuth(); go('home'); toast('已退出登录'); };
+}
+
+function drawRadar(){
+  const svg = $('#radar');
+  if (!svg) return;
+  const cx = 180, cy = 140, R = 96, n = radarData.length;
+  const pt = (i, r) => {
+    const a = -Math.PI/2 + i * 2 * Math.PI / n;
+    return [cx + Math.cos(a) * r, cy + Math.sin(a) * r];
+  };
+  let h = '';
+  for (let l = 1; l <= 4; l++){
+    const pts = radarData.map((_,i) => pt(i, R*l/4).join(',')).join(' ');
+    h += `<polygon points="${pts}" style="fill:none;stroke:var(--line)" stroke-width="1"/>`;
+  }
+  radarData.forEach((_,i) => {
+    const [x,y] = pt(i, R);
+    h += `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" style="stroke:var(--line)" stroke-width="1"/>`;
+  });
+  const dp = radarData.map((d,i) => pt(i, R*d.v).join(',')).join(' ');
+  h += `<polygon points="${dp}" style="fill:var(--accent);stroke:var(--accent)" fill-opacity=".16" stroke-width="2" stroke-linejoin="round"/>`;
+  radarData.forEach((d,i) => {
+    const [x,y] = pt(i, R*d.v);
+    h += `<circle cx="${x}" cy="${y}" r="3.4" style="fill:var(--accent)"/>`;
+  });
+  radarData.forEach((d,i) => {
+    const [x,y] = pt(i, R + 26);
+    h += `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="middle" font-size="12" style="fill:var(--ink-soft)">${d.k}</text>`;
+    const [x2,y2] = pt(i, R + 42);
+    h += `<text x="${x2}" y="${y2}" text-anchor="middle" dominant-baseline="middle" font-size="11.5" font-weight="700" style="fill:var(--ink)">${Math.round(d.v*100)}%</text>`;
+  });
+  svg.innerHTML = h;
+  $('#radarLegend').innerHTML = [...radarData].sort((a,b) => a.v - b.v).map(d =>
+    `<div class="legend-row"><span style="min-width:66px">${d.k}</span>
+      <span class="legend-bar"><i style="width:${d.v*100}%"></i></span>
+      <span class="legend-val">${Math.round(d.v*100)}%</span></div>`).join('');
+}
+
+function openUserList(kind){
+  const data = kind === 'following' ? following : followers;
+  openModal(`
+    <h3>${kind === 'following' ? '我的关注' : '我的粉丝'}</h3>
+    <p>${kind === 'following' ? '关注后可以在主页看到他们的新题解' : '关注你的人，可以互相关注'}</p>
+    <div id="userList">
+      ${data.map((u,i) => `<div class="user-row">
+        <span class="avatar">${u.a}</span>
+        <div class="um"><div class="un">${u.n}</div><div class="ub">${u.b}</div></div>
+        <button class="mini ${u.f?'on':''}" data-u="${i}">${u.f ? '已关注' : '关注'}</button>
+      </div>`).join('')}
+    </div>
+    <div class="modal-foot"><button class="btn" data-close>关闭</button></div>`);
+  $$('#userList .mini').forEach(b => b.onclick = () => {
+    const u = data[b.dataset.u];
+    u.f = !u.f;
+    b.classList.toggle('on', u.f);
+    b.textContent = u.f ? '已关注' : '关注';
+    if (kind === 'following') S.user.following += u.f ? 1 : -1;
+    toast(u.f ? `已关注 ${u.n}` : `已取消关注 ${u.n}`);
+  });
+}
+
+/* ========================= 筛选 ========================= */
+$$('#filters .chip').forEach(c => c.onclick = () => {
+  c.classList.toggle('on');
+  const set = S.filter[c.dataset.f];
+  const v = c.dataset.f === 'level' ? Number(c.dataset.v) : c.dataset.v;
+  set.has(v) ? set.delete(v) : set.add(v);
+  renderList();
+});
+$('#kw').oninput = e => { S.kw = e.target.value.trim(); renderList(); };
+
+$$('#meFilters .chip').forEach(c => c.onclick = () => {
+  const g = c.dataset.mf;
+  $$(`#meFilters .chip[data-mf="${g}"]`).forEach(x => x.classList.remove('on'));
+  c.classList.add('on');
+  S.meFilter[g] = c.dataset.v;
+  renderMeList();
+});
+
+/* ========================= 计时 ========================= */
+function fmt(s){ return String(Math.floor(s/60)).padStart(2,'0') + ':' + String(s%60).padStart(2,'0'); }
+function startTimer(reset){
+  clearInterval(S.tick);
+  if (S.timerMode === 'NONE'){ $('#timer').hidden = true; return; }
+  $('#timer').hidden = false;
+  if (reset) S.seconds = 0;
+  $('#clock').textContent = fmt(S.seconds);
+  S.tick = setInterval(() => { S.seconds++; $('#clock').textContent = fmt(S.seconds); }, 1000);
+}
+$$('#mode .chip').forEach(c => c.onclick = () => {
+  $$('#mode .chip').forEach(x => x.classList.remove('on'));
+  c.classList.add('on');
+  S.timerMode = c.dataset.mode;
+  $('#btnFinish').hidden = S.timerMode !== 'WHOLE_PAPER';
+  $('#modeHint').textContent = {
+    NONE:'不计时：界面不出现计时器，提交时不上报耗时，也不进任何统计。',
+    PER_PROBLEM:'单题计时：每换一道题重新计时，只作记录，不影响判分。',
+    WHOLE_PAPER:'整套计时：一次会话连续计时，交卷后给总耗时、总分和逐题对错。'
+  }[S.timerMode];
+  startTimer(S.timerMode !== 'WHOLE_PAPER');
+  toast('已切换为' + c.textContent.trim());
+});
+$('#btnFinish').onclick = () => {
+  const answered = Object.keys(S.results).length;
+  if (!answered) return toast('还没有作答记录，先做几题再交卷');
+  S.sessions.unshift({n:answered, c:S.correct, t:S.seconds, at:new Date()});
+  clearInterval(S.tick);
+  toast(`交卷成功：${answered} 题，答对 ${S.correct} 题，用时 ${fmt(S.seconds)}`);
+  S.seconds = 0; startTimer(true);
+};
+
+/* ========================= 题目渲染 ========================= */
+function levelIcon(lv){
+  const bars = [[1,9,6],[6.2,lv>=3?5.5:9,lv>=3?9.5:6],[11.4,lv>=4?2:9,lv>=4?13:6]];
+  return `<svg class="lv-icon" viewBox="0 0 16 16" style="color:var(--second)">` +
+    bars.map((b,i) => `<rect x="${b[0]}" y="${b[1]}" width="3.6" height="${b[2]}" rx="1.2" opacity="${i < lv-1 ? 1 : .2}"/>`).join('') + `</svg>`;
+}
+function renderProblem(){
+  const p = cur();
+  const done = S.results[p.id];
+  if (!S.attemptKeys[p.id]) S.attemptKeys[p.id] = newAttemptKey();
+  $('#meta').innerHTML = `
+    <span class="tag src">${p.src}</span>
+    <span class="tag">${p.tag}</span>
+    <span class="tag">${p.grade}</span>
+    <span class="tag">${TYPE_NAME[p.type]}</span>
+    <span class="chip" style="cursor:default">${levelIcon(p.level)}${LEVEL_NAME[p.level]}</span>
+    <span class="icon-btn ${S.favs[p.id]?'on':''}" id="btnFav" title="收藏">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linejoin="round">
+        <path d="M12 4l2.4 5.2 5.6.7-4.1 3.9 1.1 5.6L12 16.7 6.9 19.4 8 13.8 3.9 9.9l5.6-.7z"/>
+      </svg>
+    </span>`;
+  $('#btnFav').onclick = () => {
+    S.favs[p.id] = !S.favs[p.id];
+    $('#btnFav').classList.toggle('on', S.favs[p.id]);
+    toast(S.favs[p.id] ? '已收藏，可在「我的练习」按收藏筛选' : '已取消收藏');
+  };
+  $('#qTitle').textContent = p.title;
+  $('#qStem').innerHTML = p.stem;
+  typeset($('#qStem'));
+  $('#bar').style.width = (problems.indexOf(p) + 1) / problems.length * 100 + '%';
+  renderAnswerZone(p);
+  $('#resultBox').innerHTML = '';
+  $('#bubble').hidden = false;
+  $('#btnSubmit').disabled = false;
+  $('#btnSubmit').textContent = '提交答案';
+  if (done) showResult(p, done, false);
+  renderRec();
+  renderList();
+  if (S.timerMode === 'PER_PROBLEM') startTimer(true);
+}
+
+function renderAnswerZone(p){
+  const z = $('#answerZone');
+  const saved = S.answers[p.id] || {};
+  if (p.type === 'SINGLE' || p.type === 'MULTI'){
+    z.innerHTML = `<div class="opts two-col">` + p.options.map((o,i) =>
+      `<div class="opt" data-k="${KEYS[i]}"><span class="opt-key">${KEYS[i]}</span><span>${o}</span></div>`).join('') + `</div>`;
+    const picked = new Set(p.type === 'SINGLE' ? (saved.choice ? [saved.choice] : []) : (saved.choices || []));
+    z.querySelectorAll('.opt').forEach(el => {
+      el.classList.toggle('on', picked.has(el.dataset.k));
+      el.onclick = () => {
+        if (S.results[p.id]) return;
+        if (p.type === 'SINGLE'){
+          z.querySelectorAll('.opt').forEach(x => x.classList.remove('on'));
+          el.classList.add('on');
+          S.answers[p.id] = {choice: el.dataset.k};
+        } else {
+          el.classList.toggle('on');
+          S.answers[p.id] = {choices: [...z.querySelectorAll('.opt.on')].map(x => x.dataset.k)};
+        }
+      };
+    });
+  } else if (p.type === 'JUDGE'){
+    z.innerHTML = `<div class="opts two-col">
+      <div class="opt" data-v="true"><span class="opt-key">√</span><span>正确</span></div>
+      <div class="opt" data-v="false"><span class="opt-key">×</span><span>错误</span></div></div>`;
+    z.querySelectorAll('.opt').forEach(el => {
+      el.classList.toggle('on', String(saved.value) === el.dataset.v);
+      el.onclick = () => {
+        if (S.results[p.id]) return;
+        z.querySelectorAll('.opt').forEach(x => x.classList.remove('on'));
+        el.classList.add('on');
+        S.answers[p.id] = {value: el.dataset.v === 'true'};
+      };
+    });
+  } else if (p.type === 'NUMERIC'){
+    z.innerHTML = `<div class="blank-row"><label>答案</label>
+      <input class="fill" id="numIn" placeholder="填入数值，支持 3/4 这类分数" value="${saved.value ?? ''}">
+      <span class="unit">${p.unit || ''}</span></div>`;
+    $('#numIn').oninput = e => S.answers[p.id] = {value: e.target.value.trim()};
+  } else if (p.type === 'BLANK'){
+    z.innerHTML = p.blanks.map(b => `<div class="blank-row"><label>${b.label}</label>
+      <input class="fill" data-b="${b.key}" placeholder="第 ${b.key} 空" value="${(saved.blanks||{})[b.key] ?? ''}"></div>`).join('');
+    z.querySelectorAll('input').forEach(i => i.oninput = () => {
+      const blanks = {};
+      z.querySelectorAll('input').forEach(x => blanks[x.dataset.b] = x.value.trim());
+      S.answers[p.id] = {blanks};
+    });
+  } else {
+    z.innerHTML = `<textarea class="fill" id="proofIn" placeholder="写出你的推理过程，过程题由老师人工批改，不会自动判分">${saved.text ?? ''}</textarea>`;
+    $('#proofIn').oninput = e => S.answers[p.id] = {text: e.target.value};
+  }
+}
+
+/* ========================= 判题（演示；真实在服务端） ========================= */
+function normalize(v){
+  const s = String(v).trim().replace(/\s/g,'');
+  if (/^-?\d+\/\d+$/.test(s)){ const [a,b] = s.split('/'); return Number(a)/Number(b); }
+  return isNaN(Number(s)) ? s : Number(s);
+}
+function grade(p, ans){
+  const max = 100;
+  if (!ans || !Object.keys(ans).length) return null;
+  switch (p.type){
+    case 'SINGLE': {
+      const ok = ans.choice === p.answer.choice;
+      return {result: ok?'CORRECT':'WRONG', score: ok?max:0, detail:`你的选择 <code>${ans.choice}</code>，标准答案 <code>${p.answer.choice}</code>。`};
+    }
+    case 'MULTI': {
+      const mine = new Set(ans.choices||[]), std = new Set(p.answer.choices);
+      const extra = [...mine].filter(x => !std.has(x));
+      const hit = [...mine].filter(x => std.has(x));
+      if (extra.length) return {result:'WRONG', score:0, detail:`多选了 <code>${extra.join('、')}</code>。多选题选错一项即不得分。`};
+      if (hit.length === std.size) return {result:'CORRECT', score:max, detail:`完全正确：<code>${[...std].join('、')}</code>。`};
+      return {result:'PARTIAL', score:Math.round(max*hit.length/std.size/2),
+        detail:`少选了 <code>${[...std].filter(x=>!mine.has(x)).join('、')}</code>。漏选按一半计分。`};
+    }
+    case 'NUMERIC': {
+      const mine = normalize(ans.value), std = p.answer.value, tol = p.answer.tolerance ?? 0;
+      const ok = typeof mine === 'number' && Math.abs(mine - std) <= tol;
+      return {result: ok?'CORRECT':'WRONG', score: ok?max:0,
+        detail:`你的答案 <code>${ans.value}</code>，标准答案 <code>${std}</code>${tol?`（容差 ±${tol}）`:''}。分数与小数会先归一化再比较。`};
+    }
+    case 'JUDGE': {
+      const ok = ans.value === p.answer.value;
+      return {result: ok?'CORRECT':'WRONG', score: ok?max:0,
+        detail:`你的判断 <code>${ans.value?'正确':'错误'}</code>，标准答案 <code>${p.answer.value?'正确':'错误'}</code>。`};
+    }
+    case 'BLANK': {
+      const mine = ans.blanks || {}, std = p.answer.blanks, keys = Object.keys(std), per = max / keys.length;
+      const rows = keys.map(k => ({k, ok: normalize(mine[k] ?? '') === normalize(std[k]), mine: mine[k] || '（空）', std: std[k]}));
+      const hit = rows.filter(r => r.ok).length;
+      return {
+        result: hit === keys.length ? 'CORRECT' : hit ? 'PARTIAL' : 'WRONG',
+        score: Math.round(per * hit),
+        detail: rows.map(r => `第 ${r.k} 空：<code>${r.mine}</code> ${r.ok?'✓':'✗ 正确为 <code>'+r.std+'</code>'}`).join('<br>')
+          + `<br>按空给分，每空 ${Math.round(per)} 分。`
+      };
+    }
+    default:
+      return {result:'PENDING_REVIEW', score:0, detail:'过程题已提交，等待人工批改。系统不会自动给分，解析可以先看。'};
+  }
+}
+
+/* ========================= 提交 ========================= */
+$('#btnSubmit').onclick = () => {
+  const p = cur();
+  if (S.results[p.id]){ nextProblem(); return; }
+  const r = grade(p, S.answers[p.id]);
+  if (!r) return toast('请先作答再提交');
+  r.ms = S.timerMode === 'NONE' ? null : S.seconds;
+  r.at = new Date();
+  r.problemVersion = p.version;
+  r.idempotencyKey = S.attemptKeys[p.id];
+  (S.attempts[p.id] ||= []).push({...r});
+  delete S.attemptKeys[p.id];
+  S.results[p.id] = r;
+  S.done++;
+  if (r.result === 'CORRECT') S.correct++;
+  const item = S.wrongItems[p.id];
+  if (r.result === 'WRONG' || r.result === 'PARTIAL'){
+    S.wrongItems[p.id] = {
+      lastVersion:p.version, lastWrongAt:r.at, consecutiveCorrect:0, mastered:false
+    };
+    if (!S.wrong.includes(p.id)) S.wrong.push(p.id);
+  } else if (r.result === 'CORRECT' && item && !item.mastered){
+    item.consecutiveCorrect++;
+    if (item.consecutiveCorrect >= MASTERY_THRESHOLD){
+      item.mastered = true;
+      S.wrong = S.wrong.filter(id => id !== p.id);
+      toast(`连续做对 ${MASTERY_THRESHOLD} 次，已移出错题本`);
+    }
+  }
+  if (S.timerMode === 'PER_PROBLEM') clearInterval(S.tick);
+  showResult(p, r, true);
+  updateProgress();
+  renderList();
+};
+function nextProblem(){
+  const i = problems.findIndex(x => x.id === S.current);
+  S.current = problems[(i + 1) % problems.length].id;
+  renderProblem();
+}
+function showResult(p, r, fresh){
+  const tone = r.result === 'CORRECT' ? 'ok' : r.result === 'PENDING_REVIEW' ? 'wait' : 'bad';
+  const title = {CORRECT:'回答正确',PARTIAL:'部分正确',WRONG:'回答错误',PENDING_REVIEW:'已提交，待人工批改'}[r.result];
+  $('#bubble').hidden = true;
+  $('#resultBox').innerHTML = `
+    <div class="result ${tone}">
+      <div class="result-head">
+        <span class="result-title">${title}</span>
+        <span class="state ${tone}">${r.score} / 100</span>
+        <span class="result-score">${r.ms != null ? '用时 ' + fmt(r.ms) : '未计时'} · Key ${r.idempotencyKey.slice(0,8)}…</span>
+      </div>
+      <div class="result-detail">${r.detail}</div>
+      <div class="result-actions">
+        <button class="btn" id="resExplain">展开解析</button>
+        <button class="btn" id="resRetry">重新作答</button>
+        <button class="btn" id="resSolutions">看看别人怎么做（${(solutionsByProblem[p.id]||[]).length} 篇题解）</button>
+      </div>
+      <div class="explain" id="explainBox" hidden><h4>解析</h4><div>${p.explain}</div></div>
+    </div>`;
+  $('#resExplain').onclick = () => {
+    const b = $('#explainBox');
+    b.hidden = !b.hidden;
+    $('#resExplain').textContent = b.hidden ? '展开解析' : '收起解析';
+  };
+  $('#resSolutions').onclick = () => openDrawer(p);
+  $('#resRetry').onclick = () => {
+    delete S.results[p.id];
+    delete S.answers[p.id];
+    S.attemptKeys[p.id] = newAttemptKey();
+    renderProblem();
+    toast('已开始新的作答；重复提交才复用旧 key，本次使用新 key');
+  };
+  typeset($('#resultBox'));
+  if (p.type === 'SINGLE' || p.type === 'MULTI'){
+    const std = p.type === 'SINGLE' ? [p.answer.choice] : p.answer.choices;
+    $$('#answerZone .opt').forEach(el => {
+      if (std.includes(el.dataset.k)) el.classList.add('right');
+      else if (el.classList.contains('on')) el.classList.add('wrong');
+    });
+  }
+  if (p.type === 'JUDGE'){
+    $$('#answerZone .opt').forEach(el => {
+      if (el.dataset.v === String(p.answer.value)) el.classList.add('right');
+      else if (el.classList.contains('on')) el.classList.add('wrong');
+    });
+  }
+  $('#btnSubmit').textContent = '下一题';
+  if (fresh && (r.result === 'WRONG' || r.result === 'PARTIAL')) toast('这道题已自动加入错题本');
+}
+
+/* ========================= 解析 / 题解抽屉 ========================= */
+$('#btnExplain').onclick = () => {
+  const p = cur();
+  const box = $('#explainBox');
+  if (box){
+    box.hidden = !box.hidden;
+    const b = $('#resExplain');
+    if (b) b.textContent = box.hidden ? '展开解析' : '收起解析';
+    return;
+  }
+  $('#bubble').hidden = true;
+  $('#resultBox').innerHTML = `<div class="result">
+    <div class="result-head"><span class="result-title">解析</span>
+    <span class="result-score">未提交也可查看 · 接口按用户与 IP 限流</span></div>
+    <div class="explain" id="explainBox" style="border:0;margin:0;padding:8px 0 0">${p.explain}</div>
+    <div class="result-actions"><button class="btn" id="resSolutions">看看别人怎么做（${(solutionsByProblem[p.id]||[]).length} 篇题解）</button></div>
+  </div>`;
+  $('#resSolutions').onclick = () => openDrawer(p);
+  typeset($('#resultBox'));
+};
+$('#btnSolutions').onclick = () => openDrawer(cur());
+
+function openDrawer(p){
+  const list = solutionsByProblem[p.id] || [];
+  $('#drawer').innerHTML = `
+    <div class="drawer-head">
+      <h2>题解</h2>
+      <button class="icon-btn" id="drawerClose" title="关闭">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="drawer-sub">${p.title} · ${p.tag} · 共 ${list.length} 篇，均已通过审核</div>
+    ${list.map((s,i) => `<section class="card sol">
+      <div class="sol-head">
+        <span class="sol-avatar">${s.a}</span>
+        <div><div style="font-weight:600;font-size:14px">${s.n}</div>
+        <div style="font-size:12.5px;color:var(--ink-soft)">2 天前发布</div></div>
+      </div>
+      <div class="sol-body">${s.b}</div>
+      <div class="sol-foot">
+        <span class="mini ${S.likes[p.id+'-'+i]?'on':''}" data-like="${i}">赞 ${s.l + (S.likes[p.id+'-'+i]?1:0)}</span>
+        <span class="mini" data-cmt="${i}">评论 ${s.c.length}</span>
+        <span class="mini" data-rep="${i}">反馈</span>
+      </div>
+      <div class="comments" id="cmt-${i}" hidden>
+        ${s.c.map(c => `<div class="comment"><b>${c[0]}</b><span>${c[1]}</span></div>`).join('')
+          || '<div class="comment" style="color:var(--ink-soft)">还没有评论，来写第一条</div>'}
+      </div>
+    </section>`).join('') || '<section class="card empty">这道题还没有题解，提交后可以写第一篇</section>'}
+    <button class="btn btn-primary" style="width:100%;margin-top:6px" id="writeSol">写我的题解</button>`;
+  $('#drawer').classList.add('open');
+  $('#drawerMask').classList.add('open');
+  $('#drawerClose').onclick = closeDrawer;
+  $('#writeSol').onclick = () => toast('题解提交后进入审核队列，通过后才会公开展示');
+  $$('#drawer [data-like]').forEach(b => b.onclick = () => {
+    const key = p.id + '-' + b.dataset.like;
+    S.likes[key] = !S.likes[key];
+    b.classList.toggle('on', S.likes[key]);
+    b.textContent = '赞 ' + (list[b.dataset.like].l + (S.likes[key] ? 1 : 0));
+  });
+  $$('#drawer [data-cmt]').forEach(b => b.onclick = () => {
+    const box = $('#cmt-' + b.dataset.cmt);
+    box.hidden = !box.hidden;
+  });
+  $$('#drawer [data-rep]').forEach(b => b.onclick = () => toast('反馈已提交，会进入同一个审核队列'));
+}
+function closeDrawer(){
+  $('#drawer').classList.remove('open');
+  $('#drawerMask').classList.remove('open');
+}
+$('#drawerMask').onclick = closeDrawer;
+document.addEventListener('keydown', e => { if (e.key === 'Escape'){ closeDrawer(); closeModal(); } });
+
+/* ========================= 分类 / 反馈 ========================= */
+$('#btnLabel').onclick = () => {
+  const p = cur();
+  openModal(`
+    <h3>加入我的分类</h3>
+    <p>「${p.title}」· 分类只有你自己能看到</p>
+    <div class="labels" id="modalLabels">
+      ${labels.map((l,i) => `<span class="label ${l.on?'on':''}" data-i="${i}">${l.name} <b>${l.n}</b></span>`).join('')}
+      <span class="label dash" id="newLabel">+ 新建分类</span>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" data-close>取消</button>
+      <button class="btn btn-primary" id="saveLabel">保存</button>
+    </div>`);
+  $$('#modalLabels .label[data-i]').forEach(el => el.onclick = () => el.classList.toggle('on'));
+  $('#newLabel').onclick = () => toast('原型演示：真实版本弹出输入框，单用户上限 50 个分类');
+  $('#saveLabel').onclick = () => {
+    const els = $$('#modalLabels .label[data-i]');
+    labels.forEach((l,i) => l.on = els[i].classList.contains('on'));
+    const picked = labels.filter(l => l.on).map(l => l.name);
+    closeModal(); renderLabels();
+    toast(picked.length ? '已加入：' + picked.join('、') : '已移出全部分类');
+  };
+};
+$('#btnReport').onclick = () => {
+  const reasons = ['答案或解析有误','涉嫌抄袭 / 侵权','广告或垃圾内容','辱骂或不友善','其他问题'];
+  openModal(`
+    <h3>内容反馈</h3>
+    <p>发现题目答案不对，或内容有问题，都可以提给我们</p>
+    <div class="radio-list" id="reasonList">
+      ${reasons.map((r,i) => `<div class="radio ${i===0?'on':''}" data-r="${r}"><i></i>${r}</div>`).join('')}
+    </div>
+    <div class="modal-foot">
+      <button class="btn" data-close>取消</button>
+      <button class="btn btn-primary" id="sendReport">提交反馈</button>
+    </div>`);
+  $$('#reasonList .radio').forEach(el => el.onclick = () => {
+    $$('#reasonList .radio').forEach(x => x.classList.remove('on'));
+    el.classList.add('on');
+  });
+  $('#sendReport').onclick = () => {
+    const r = $('#reasonList .radio.on').dataset.r;
+    closeModal();
+    toast(`已提交「${r}」，会进入审核队列，处理结果会通知你`);
+  };
+};
+
+/* ========================= 列表 / 侧栏 ========================= */
+function renderList(){
+  const items = problems.filter(p =>
+    S.filter.type.has(p.type) &&
+    (!S.filter.level.size || S.filter.level.has(p.level)) &&
+    (!S.kw || (p.title + p.tag + p.src).includes(S.kw)));
+  $('#listCount').textContent = `按知识点与难度排序 · 共 ${items.length} 题`;
+  $('#list').innerHTML = items.map((p,i) => {
+    const r = S.results[p.id];
+    const st = !r ? ['new','未开始'] : r.result === 'CORRECT' ? ['ok','已做对']
+      : r.result === 'PENDING_REVIEW' ? ['wait','待批改'] : ['bad','错题'];
+    return `<article class="card row ${p.id===S.current?'active':''}" data-id="${p.id}">
+      <span class="row-idx">${String(i+1).padStart(2,'0')}</span>
+      <div class="row-main">
+        <div class="row-title">${p.title}</div>
+        <div class="row-sub">${p.tag} · ${p.src} · ${TYPE_NAME[p.type]} · ${LEVEL_NAME[p.level]}</div>
+      </div>
+      <span class="state ${st[0]}">${st[1]}</span>
+    </article>`;
+  }).join('') || `<div class="card empty">没有符合条件的题目，试试放宽筛选</div>`;
+  $$('#list .row').forEach(el => el.onclick = () => {
+    S.current = Number(el.dataset.id);
+    renderProblem();
+    window.scrollTo({top:0, behavior:'smooth'});
+  });
+}
+function renderLabels(){
+  $('#labelList').innerHTML = labels.map(l =>
+    `<span class="label ${l.on?'on':''}">${l.name} <b>${l.n}</b></span>`).join('')
+    + `<span class="label dash" id="quickNew">+ 新建</span>`;
+  $('#quickNew').onclick = () => toast('原型演示：新建分类后可直接把题目归入');
+}
+function renderRec(){
+  const p = cur();
+  const rec = problems.filter(x => x.id !== p.id && (x.tag === p.tag || Math.abs(x.level - p.level) <= 1)).slice(0,3);
+  $('#recList').innerHTML = rec.map(x =>
+    `<a data-id="${x.id}"><span class="dot"></span>${x.title}<small>${LEVEL_NAME[x.level]}</small></a>`).join('');
+  $$('#recList a').forEach(el => el.onclick = () => {
+    S.current = Number(el.dataset.id);
+    renderProblem();
+    toast('已切换到相似题');
+  });
+}
+function updateProgress(){
+  $('#doneNum').textContent = S.done;
+  $('#rate').textContent = S.done ? Math.round(S.correct / S.done * 100) + '%' : '—';
+  $('#ring').setAttribute('stroke-dashoffset', 283 - 283 * Math.min(S.done/20, 1));
+}
+
+/* ========================= 我的练习 ========================= */
+function renderMe(){
+  $('#meDone').textContent = S.done;
+  $('#meRate').textContent = S.done ? Math.round(S.correct/S.done*100) + '%' : '—';
+  $('#meWrong').textContent = S.wrong.length;
+  renderMeList();
+  $('#sessionList').innerHTML = S.sessions.length ? S.sessions.map((s,i) =>
+    `<article class="card row"><span class="row-idx">${String(i+1).padStart(2,'0')}</span>
+     <div class="row-main"><div class="row-title">整套练习 ${s.n} 题 · 答对 ${s.c} 题</div>
+     <div class="row-sub">总耗时 ${fmt(s.t)} · ${s.at.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})} 交卷</div></div>
+     <span class="state ok">已完成</span></article>`).join('')
+    : `<div class="card empty">切到「整套计时」并交卷后，这里会出现练习记录</div>`;
+}
+function renderMeList(){
+  const f = S.meFilter;
+  let ids = [];
+  if (f.kind === 'WRONG') ids = [...S.wrong];
+  else if (f.kind === 'FAV') ids = Object.keys(S.favs).filter(k => S.favs[k]).map(Number);
+  else ids = labels.some(l => l.on) ? problems.map(p => p.id).filter(id => S.results[id] || S.favs[id]) : [];
+
+  let items = ids.map(id => problems.find(p => p.id === id)).filter(Boolean);
+  if (f.tag !== 'ALL') items = items.filter(p => p.tag === f.tag);
+  if (f.time !== 'ALL'){
+    const now = Date.now();
+    const span = f.time === 'TODAY' ? 864e5 : 7 * 864e5;
+    items = items.filter(p => {
+      const r = S.results[p.id];
+      return r && r.at ? now - r.at.getTime() <= span : f.kind === 'FAV';
+    });
+  }
+  $('#meCount').textContent = `共 ${items.length} 题 · 按${{ALL:'全部时间',TODAY:'今天',WEEK:'最近 7 天'}[f.time]}筛选`;
+  $('#meList').innerHTML = items.map(p => {
+    const r = S.results[p.id];
+    return `<article class="card row" data-id="${p.id}">
+      <span class="row-idx">${LEVEL_NAME[p.level][0]}</span>
+      <div class="row-main"><div class="row-title">${p.title}</div>
+        <div class="row-sub">${p.tag} · ${TYPE_NAME[p.type]}${r ? ' · 最近得分 ' + r.score + '/100' : ''}${S.favs[p.id] ? ' · 已收藏' : ''}${S.wrongItems[p.id] && S.wrongItems[p.id].lastVersion !== p.version ? ' · 此题已更新，可查看当时版本 v'+S.wrongItems[p.id].lastVersion : ''}</div>
+      </div>
+      <span class="state ${S.wrongItems[p.id]?.mastered ? 'ok' : r ? 'bad' : 'new'}">${S.wrongItems[p.id]?.mastered ? '已掌握' : S.wrongItems[p.id] ? `待复习 · 连对 ${S.wrongItems[p.id].consecutiveCorrect}/${MASTERY_THRESHOLD}` : '未作答'}</span>
+    </article>`;
+  }).join('') || `<div class="card empty">${
+    f.kind === 'WRONG' ? '还没有错题，做错的题会自动收进来' :
+    f.kind === 'FAV' ? '还没有收藏，题目右上角的星形按钮可以收藏' :
+    '先在侧栏选中分类，再回到这里查看'}</div>`;
+  $$('#meList .row').forEach(el => el.onclick = () => {
+    S.current = Number(el.dataset.id);
+    renderProblem();
+    go('problems');
+  });
+}
+
+/* ========================= 资料 ========================= */
+$('#matGrid').innerHTML = materials.map((m,i) => `
+  <section class="card mat">
+    <div class="mat-title">${m.t}</div>
+    <div class="mat-meta">${m.m} · 已下载 ${m.n} 次</div>
+    <div class="mat-foot">
+      <button class="btn btn-primary" data-dl="${i}">申请下载</button>
+      <button class="btn" data-fav="${i}">收藏</button>
+    </div>
+  </section>`).join('');
+$$('#matGrid [data-dl]').forEach(b => b.onclick = () => {
+  if (!S.user) return openLogin();
+  toast('已生成签名下载链接，5 分钟内有效 · 仅发布来源凭证完整且扫描通过的 PDF');
+});
+$$('#matGrid [data-fav]').forEach(b => b.onclick = () => { b.classList.toggle('btn-primary'); toast('收藏状态已更新'); });
+
+/* ========================= Toast / Modal ========================= */
+let toastTimer;
+function toast(msg){
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+}
+function openModal(html){
+  const m = $('#mask');
+  m.hidden = false;
+  m.innerHTML = `<div class="modal">${html}</div>`;
+  m.onclick = e => { if (e.target === m || e.target.hasAttribute('data-close')) closeModal(); };
+}
+function closeModal(){ $('#mask').hidden = true; $('#mask').innerHTML = ''; }
+
+/* ========================= 启动 ========================= */
+syncAuth();
+renderLabels();
+updateProgress();
+renderProblem();
+startTimer(true);
+</script>
+</body>
+</html>
