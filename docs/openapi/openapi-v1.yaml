@@ -491,6 +491,53 @@ paths:
           $ref: '#/components/responses/Error'
         '403':
           $ref: '#/components/responses/Error'
+    get:
+      tags: [admin]
+      operationId: listAdminProblems
+      summary: 管理端题目列表
+      description: 和公开列表不同，这里能看到 DRAFT，但仍然不返回答案。按更新时间倒序。
+      parameters:
+        - in: query
+          name: status
+          schema:
+            $ref: '#/components/schemas/PublishStatus'
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+            maximum: 200
+      responses:
+        '200':
+          description: 题目列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AdminProblemSummary'
+        '403':
+          $ref: '#/components/responses/Error'
+
+  /api/v1/admin/problems/{id}:
+    get:
+      tags: [admin]
+      operationId: getAdminProblem
+      summary: 管理端题目详情
+      description: 编辑回填用，是唯一会同时返回标准答案、解析与内部来源字段的读接口。
+      parameters:
+        - $ref: '#/components/parameters/ProblemId'
+      responses:
+        '200':
+          description: 可编辑的完整题目
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminProblemDetail'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
 
   /api/v1/admin/problems/import:
     post:
@@ -1248,6 +1295,74 @@ components:
           type: integer
         status:
           $ref: '#/components/schemas/PublishStatus'
+
+    AdminProblemSummary:
+      type: object
+      required: [id, title, type, difficulty, grade, status]
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        type:
+          $ref: '#/components/schemas/ProblemType'
+        difficulty:
+          type: integer
+        grade:
+          type: string
+        status:
+          $ref: '#/components/schemas/PublishStatus'
+        originType:
+          $ref: '#/components/schemas/ProblemOriginType'
+        versionNo:
+          type: integer
+        updatedAt:
+          type: string
+
+    AdminProblemDetail:
+      type: object
+      required: [id, title, type, difficulty, grade, status, stemMd, answerJson, explanationMd, versionNo, tagIds]
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        type:
+          $ref: '#/components/schemas/ProblemType'
+        difficulty:
+          type: integer
+        grade:
+          type: string
+        status:
+          $ref: '#/components/schemas/PublishStatus'
+        stemMd:
+          type: string
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProblemOption'
+        answerJson:
+          $ref: '#/components/schemas/AnswerJson'
+        explanationMd:
+          type: string
+        graderConfig:
+          $ref: '#/components/schemas/GraderConfig'
+        maxScore:
+          type: integer
+        versionNo:
+          type: integer
+        versionId:
+          type: integer
+          format: int64
+        tagIds:
+          type: array
+          items:
+            type: integer
+            format: int64
+        source:
+          $ref: '#/components/schemas/ProblemSourceInput'
 
     ImportProblemsRequest:
       type: object

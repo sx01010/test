@@ -10,7 +10,15 @@ const TYPE_NAME = { SINGLE: '单选', MULTI: '多选', JUDGE: '判断', NUMERIC:
 const LEVEL_NAME = { 2: '入门', 3: '进阶', 4: '挑战' };
 const ORIGIN_NAME = { ORIGINAL: '原创', ADAPTED: '改编', LICENSED: '已授权', PUBLIC: '公开来源' };
 const RESULT_NAME = { CORRECT: '回答正确', PARTIAL: '部分正确', WRONG: '回答错误' };
+const STATUS_NAME = { DRAFT: '草稿', PUBLISHED: '已发布', HIDDEN: '已隐藏' };
 const KEYS = ['A', 'B', 'C', 'D', 'E', 'F'];
+// 来源类型决定发布前还要补哪一个字段，和后端 AdminProblemService 的闸门一一对应
+const SOURCE_EXTRA = {
+  ORIGINAL: null,
+  ADAPTED: ['rewriteNote', '改编说明', '写清改了哪些数据与表述。发布前必填。'],
+  LICENSED: ['licenseRef', '授权凭证', '授权编号或凭证文件 key。发布前必填。'],
+  PUBLIC: ['sourceUrl', '公开来源链接', '能追溯到原始出处的链接。发布前必填。']
+};
 const REASONS = [
   ['ANSWER_ERROR', '答案或解析有误'],
   ['TYPO', '错别字或排版问题'],
@@ -29,7 +37,8 @@ const S = {
   idempotencyKeys: {},
   timerMode: 'PER_PROBLEM', seconds: 0, tick: null,
   today: { done: 0, correct: 0 },
-  wrongFilter: { mastered: '0', since: 'all', tagId: null }
+  wrongFilter: { mastered: '0', since: 'all', tagId: null },
+  admin: { editingId: null }
 };
 
 /* ========================= 基础工具 ========================= */
@@ -199,11 +208,12 @@ if (savedTheme) {
   $$('#themeSwitch button').forEach(button => button.classList.toggle('on', button.dataset.themeBtn === savedTheme));
 }
 
-const VIEWS = ['problems', 'me'];
+const VIEWS = ['problems', 'me', 'admin'];
 function go(view) {
   VIEWS.forEach(name => { $(`#view-${name}`).hidden = name !== view; });
   $$('#nav a').forEach(link => link.classList.toggle('on', link.dataset.view === view));
   if (view === 'me') loadMyPractice();
+  if (view === 'admin') refreshAdminList();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 $$('#nav a').forEach(link => { link.onclick = () => go(link.dataset.view); });
@@ -214,6 +224,11 @@ function syncAuth() {
   $('#btnLogin').hidden = !!S.me;
   $('#avatar').hidden = !S.me;
   if (S.me) $('#avatar').textContent = S.me.nickname.slice(0, 1);
+
+  // 管理入口只对 ADMIN 显示；后端每个管理接口仍然会自己校验角色，这里只是别让人白点
+  const isAdmin = S.me?.role === 'ADMIN';
+  $('#navAdmin').hidden = !isAdmin;
+  if (!isAdmin && !$('#view-admin').hidden) go('problems');
 }
 
 $('#btnLogin').onclick = () => openAuthModal('login');
@@ -360,9 +375,9 @@ $('#kw').oninput = event => {
 
 async function loadTags() {
   S.tags = await api('/tags');
-  $('#tagFilter').insertAdjacentHTML('beforeend', S.tags
-    .map(tag => `<option value="${tag.id}">${esc(tag.name)}</option>`)
-    .join(''));
+  const options = S.tags.map(tag => `<option value="${tag.id}">${esc(tag.name)}</option>`).join('');
+  $('#tagFilter').insertAdjacentHTML('beforeend', options);
+  $('#apTags').innerHTML = options;
   $('#tagFilter').onchange = event => {
     S.filter.tagId = event.target.value ? Number(event.target.value) : null;
     refreshList();
@@ -956,6 +971,338 @@ async function loadRecentSubmissions() {
   });
 }
 
+/* ========================= 管理端录入 ========================= */
+
+/**
+ * R16–R17 的录入表单。选项与答案控件随题型变化，所以这一块由 JS 渲染；
+ * 校验只挡明显的空字段，语义校验（答案自检、来源闸门）全部交给后端，
+ * 前后端各写一套规则最后一定会对不上。
+ */
+function setupAdmin() {
+  $('#apType').onchange = () => {
+    const next = $('#apType').value;
+    const previous = $('#apAnswerArea').dataset.renderedType;
+    const isChoice = kind => kind === 'SINGLE' || kind === 'MULTI';
+    // 单选与多选的选项结构完全一样，互相切换时不该把已经填好的选项清掉
+    const carry = isChoice(previous) && isChoice(next) ? collectAdminAnswer(previous) : null;
+    if (carry && next === 'MULTI' && carry.answerJson?.choice) {
+      carry.answerJson = { choices: [carry.answerJson.choice] };
+    }
+    renderAdminAnswerArea(next, carry);
+  };
+  $('#apOrigin').onchange = () => renderSourceExtra($('#apOrigin').value, null);
+  $('#apStatusFilter').onchange = refreshAdminList;
+  $('#apReset').onclick = resetAdminForm;
+  $('#apSaveDraft').onclick = () => saveAdminProblem(false);
+  $('#apPublish').onclick = () => saveAdminProblem(true);
+  resetAdminForm();
+}
+
+function optionRow(type, key, textMd, checked) {
+  const control = type === 'SINGLE'
+    ? `<input type="radio" name="apCorrect" data-option-correct ${checked ? 'checked' : ''}
+              aria-label="把选项 ${key} 设为正确答案">`
+    : `<input type="checkbox" data-option-correct ${checked ? 'checked' : ''}
+              aria-label="把选项 ${key} 设为正确答案">`;
+  return `<div class="opt-edit-row" data-option-row data-key="${key}">
+    <span class="opt-key">${key}</span>
+    <input class="fill" data-option-text value="${esc(textMd)}" aria-label="选项 ${key} 的内容">
+    ${control}
+  </div>`;
+}
+
+function blankRow(index, aliases) {
+  const value = Array.isArray(aliases) ? aliases.join(',') : String(aliases ?? '');
+  return `<div class="blank-row">
+    <label for="apBlank${index}">第 ${index + 1} 空</label>
+    <input class="fill" id="apBlank${index}" data-blank-input value="${esc(value)}">
+  </div>`;
+}
+
+function renderAdminAnswerArea(type, prefill) {
+  const area = $('#apAnswerArea');
+  const answer = prefill?.answerJson || {};
+  const config = prefill?.graderConfig || {};
+  area.dataset.renderedType = type;
+
+  if (type === 'SINGLE' || type === 'MULTI') {
+    const options = prefill?.options?.length
+      ? prefill.options
+      : [{ key: 'A', textMd: '' }, { key: 'B', textMd: '' }, { key: 'C', textMd: '' }, { key: 'D', textMd: '' }];
+    const correct = new Set(type === 'SINGLE' ? [answer.choice].filter(Boolean) : (answer.choices || []));
+    area.innerHTML = `<fieldset class="opt-edit">
+      <legend>选项与正确答案</legend>
+      <div id="apOptionRows">${options
+        .map(option => optionRow(type, option.key, option.textMd, correct.has(option.key))).join('')}</div>
+      <button type="button" class="btn" id="apAddOption">添加选项</button>
+      <p class="field-hint">${type === 'SINGLE' ? '单选只能勾一个正确答案。' : '多选可以勾多个正确答案。'}留空的选项不会保存。</p>
+    </fieldset>`;
+    $('#apAddOption').onclick = () => {
+      const used = $$('#apOptionRows [data-option-row]').length;
+      if (used >= KEYS.length) return toast(`最多 ${KEYS.length} 个选项`);
+      $('#apOptionRows').insertAdjacentHTML('beforeend', optionRow(type, KEYS[used], '', false));
+    };
+    return;
+  }
+
+  if (type === 'JUDGE') {
+    area.innerHTML = `<fieldset class="opt-edit">
+      <legend>标准答案</legend>
+      <label class="inline-choice">
+        <input type="radio" name="apJudge" data-judge value="true" ${answer.value === true ? 'checked' : ''}>正确
+      </label>
+      <label class="inline-choice">
+        <input type="radio" name="apJudge" data-judge value="false" ${answer.value === false ? 'checked' : ''}>错误
+      </label>
+    </fieldset>`;
+    return;
+  }
+
+  if (type === 'NUMERIC') {
+    area.innerHTML = `<fieldset class="opt-edit">
+      <legend>标准答案</legend>
+      <div class="blank-row">
+        <label for="apNumericValue">答案</label>
+        <input class="fill" id="apNumericValue" value="${esc(answer.value ?? '')}">
+      </div>
+      <div class="blank-row">
+        <label for="apTolerance">容差</label>
+        <input class="fill" id="apTolerance" value="${esc(config.tolerance ?? '')}">
+      </div>
+      <p class="field-hint">容差按绝对误差比较，留空表示必须完全相等。</p>
+    </fieldset>`;
+    return;
+  }
+
+  const blanks = answer.blanks?.length ? answer.blanks : [['']];
+  area.innerHTML = `<fieldset class="opt-edit">
+    <legend>每个空的标准答案</legend>
+    <div id="apBlankRows">${blanks.map((aliases, index) => blankRow(index, aliases)).join('')}</div>
+    <button type="button" class="btn" id="apAddBlank">添加一个空</button>
+    <label class="inline-choice" style="margin-left:12px">
+      <input type="checkbox" id="apOrderIndependent" ${config.orderIndependent ? 'checked' : ''}>不计空的先后顺序
+    </label>
+    <p class="field-hint">一个空有多种写法时用逗号隔开，例如 <code>16,十六</code>，学生写中哪一个都算对。</p>
+  </fieldset>`;
+  $('#apAddBlank').onclick = () => {
+    const index = $$('#apBlankRows [data-blank-input]').length;
+    $('#apBlankRows').insertAdjacentHTML('beforeend', blankRow(index, ['']));
+  };
+}
+
+function renderSourceExtra(originType, prefill) {
+  const spec = SOURCE_EXTRA[originType];
+  const field = $('#apSourceExtraField');
+  if (!spec) {
+    field.hidden = true;
+    field.innerHTML = '';
+    return;
+  }
+  const [key, label, hint] = spec;
+  field.hidden = false;
+  field.innerHTML = `<label for="apSourceExtra">${label}</label>
+    <textarea id="apSourceExtra" rows="2" data-source-key="${key}">${esc(prefill?.[key] ?? '')}</textarea>
+    <p class="field-hint">${hint}</p>`;
+}
+
+function collectAdminSource() {
+  const source = {
+    originType: $('#apOrigin').value,
+    contestName: $('#apContest').value.trim() || null,
+    year: $('#apYear').value ? Number($('#apYear').value) : null,
+    round: $('#apRound').value.trim() || null
+  };
+  const extra = $('#apSourceExtra');
+  if (extra) source[extra.dataset.sourceKey] = extra.value.trim() || null;
+  return source;
+}
+
+function collectAdminAnswer(type) {
+  if (type === 'SINGLE' || type === 'MULTI') {
+    const rows = $$('#apAnswerArea [data-option-row]');
+    const options = rows
+      .map(row => ({ key: row.dataset.key, textMd: row.querySelector('[data-option-text]').value.trim() }))
+      .filter(option => option.textMd);
+    const picked = rows
+      .filter(row => row.querySelector('[data-option-correct]').checked)
+      .map(row => row.dataset.key)
+      .filter(key => options.some(option => option.key === key));
+    const answerJson = type === 'SINGLE'
+      ? (picked.length === 1 ? { choice: picked[0] } : null)
+      : (picked.length ? { choices: picked } : null);
+    return { options, answerJson, graderConfig: null };
+  }
+
+  if (type === 'JUDGE') {
+    const picked = $('#apAnswerArea [data-judge]:checked');
+    return { options: null, answerJson: picked ? { value: picked.value === 'true' } : null, graderConfig: null };
+  }
+
+  if (type === 'NUMERIC') {
+    const value = $('#apNumericValue').value.trim();
+    const tolerance = $('#apTolerance').value.trim();
+    return {
+      options: null,
+      answerJson: value ? { value } : null,
+      graderConfig: tolerance ? { tolerance: Number(tolerance) } : null
+    };
+  }
+
+  const blanks = $$('#apAnswerArea [data-blank-input]')
+    .map(input => input.value.split(/[,，]/).map(alias => alias.trim()).filter(Boolean))
+    .filter(aliases => aliases.length);
+  return {
+    options: null,
+    answerJson: blanks.length ? { blanks } : null,
+    graderConfig: { orderIndependent: $('#apOrderIndependent').checked }
+  };
+}
+
+function collectAdminPayload(publish) {
+  const type = $('#apType').value;
+  const tagIds = [...$('#apTags').selectedOptions].map(option => Number(option.value));
+  const { options, answerJson, graderConfig } = collectAdminAnswer(type);
+
+  const title = $('#apTitle').value.trim();
+  const stemMd = $('#apStem').value.trim();
+  const explanationMd = $('#apExplanation').value.trim();
+  if (!title) throw new Error('标题不能为空');
+  if (!stemMd) throw new Error('题干不能为空');
+  if (!explanationMd) throw new Error('解析必填，V1 要求自己撰写');
+  if (!tagIds.length) throw new Error('至少选一个知识点');
+  if (!answerJson) throw new Error(type === 'SINGLE' ? '请勾选唯一的正确答案' : '请把标准答案填完整');
+
+  return {
+    id: S.admin.editingId,
+    title,
+    type,
+    difficulty: Number($('#apDifficulty').value),
+    grade: $('#apGrade').value.trim(),
+    stemMd,
+    options,
+    answerJson,
+    explanationMd,
+    graderConfig,
+    maxScore: Number($('#apMaxScore').value) || 100,
+    tagIds,
+    source: collectAdminSource(),
+    changeNote: $('#apChangeNote').value.trim() || null,
+    publish
+  };
+}
+
+/** 提交失败后把焦点移到错误摘要：只弹 toast 的话，读屏用户和键盘用户根本不知道发生了什么。 */
+function showAdminError(message) {
+  const box = $('#adminError');
+  box.hidden = false;
+  box.textContent = message;
+  box.focus();
+}
+
+function hideAdminError() {
+  const box = $('#adminError');
+  box.hidden = true;
+  box.textContent = '';
+}
+
+async function saveAdminProblem(publish) {
+  let payload;
+  try {
+    payload = collectAdminPayload(publish);
+  } catch (error) {
+    return showAdminError(error.message);
+  }
+
+  const button = publish ? $('#apPublish') : $('#apSaveDraft');
+  button.disabled = true;
+  try {
+    const saved = await api('/admin/problems', { method: 'POST', body: payload });
+    S.admin.editingId = saved.id;
+    hideAdminError();
+    markAdminEditing(saved.id, saved.versionNo, saved.status);
+    toast(saved.status === 'PUBLISHED' ? `已发布，当前版本 v${saved.versionNo}` : '草稿已保存');
+    await loadAdminList();
+  } catch (error) {
+    showAdminError(error.message);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function markAdminEditing(id, versionNo, status) {
+  $('#apEditing').textContent = `正在编辑 #${id} · v${versionNo} · ${STATUS_NAME[status] || status}`;
+}
+
+function refreshAdminList() {
+  loadAdminList().catch(error => toast(error.message));
+}
+
+async function loadAdminList() {
+  const status = $('#apStatusFilter').value;
+  const rows = await api(`/admin/problems${status ? `?status=${status}` : ''}`);
+  $('#apList').innerHTML = rows.length
+    ? rows.map(row => `<a data-admin-id="${row.id}">
+        <span class="state ${row.status === 'PUBLISHED' ? 'ok' : 'new'}">${STATUS_NAME[row.status] || row.status}</span>
+        <span class="admin-row-title">${esc(row.title)}</span>
+        <small>v${row.versionNo ?? 1} · ${TYPE_NAME[row.type] || row.type} · ${(row.updatedAt || '').slice(5, 16)}</small>
+      </a>`).join('')
+    : '<p class="hint">还没有符合条件的题目，填完表单保存草稿就会出现在这里。</p>';
+
+  $$('#apList [data-admin-id]').forEach(link => {
+    link.onclick = () => openAdminProblem(Number(link.dataset.adminId));
+  });
+}
+
+async function openAdminProblem(id) {
+  let detail;
+  try {
+    detail = await api(`/admin/problems/${id}`);
+  } catch (error) {
+    return toast(error.message);
+  }
+
+  S.admin.editingId = detail.id;
+  $('#apTitle').value = detail.title;
+  $('#apType').value = detail.type;
+  $('#apDifficulty').value = String(detail.difficulty);
+  $('#apGrade').value = detail.grade;
+  $('#apMaxScore').value = detail.maxScore;
+  $('#apStem').value = detail.stemMd;
+  $('#apExplanation').value = detail.explanationMd;
+  $('#apChangeNote').value = '';
+  [...$('#apTags').options].forEach(option => {
+    option.selected = (detail.tagIds || []).includes(Number(option.value));
+  });
+
+  const source = detail.source || { originType: 'ORIGINAL' };
+  $('#apOrigin').value = source.originType;
+  $('#apContest').value = source.contestName || '';
+  $('#apYear').value = source.year ?? '';
+  $('#apRound').value = source.round || '';
+  renderSourceExtra(source.originType, source);
+  renderAdminAnswerArea(detail.type, detail);
+
+  hideAdminError();
+  markAdminEditing(detail.id, detail.versionNo, detail.status);
+  $('#apTitle').focus();
+}
+
+function resetAdminForm() {
+  S.admin.editingId = null;
+  ['apTitle', 'apStem', 'apExplanation', 'apChangeNote', 'apContest', 'apYear', 'apRound']
+    .forEach(id => { $(`#${id}`).value = ''; });
+  $('#apGrade').value = '六年级';
+  $('#apMaxScore').value = '100';
+  $('#apType').value = 'SINGLE';
+  $('#apDifficulty').value = '3';
+  $('#apOrigin').value = 'ORIGINAL';
+  [...$('#apTags').options].forEach(option => { option.selected = false; });
+  renderSourceExtra('ORIGINAL', null);
+  renderAdminAnswerArea('SINGLE', null);
+  $('#apEditing').textContent = '新建题目';
+  hideAdminError();
+}
+
 /* ========================= 启动 ========================= */
 
 (async function boot() {
@@ -963,6 +1310,7 @@ async function loadRecentSubmissions() {
   try {
     await loadMe();
     await loadTags();
+    setupAdmin();
     await reloadList();
     await loadStats();
   } catch (error) {

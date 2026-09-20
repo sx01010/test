@@ -78,6 +78,60 @@ class FrontendUiContractTest {
                 ".result.wait { border-color: var(--second); background: var(--second-soft) }");
     }
 
+    @Test
+    void adminEntryIsRoleGatedAndFormFieldsAreLabelled() throws IOException {
+        String html = resource("static/index.html");
+        String js = resource("static/app.js");
+
+        // 管理入口默认隐藏，只有 role=ADMIN 才显示
+        assertThat(html).contains("<a data-view=\"admin\" id=\"navAdmin\" hidden>管理</a>");
+        assertThat(js).contains("S.me?.role === 'ADMIN'", "$('#navAdmin').hidden = !isAdmin");
+
+        // 每个控件都有 label for 关联，不拿 placeholder 当标签
+        assertThat(html).contains(
+                "<label for=\"apTitle\">标题</label>",
+                "<label for=\"apType\">题型</label>",
+                "<label for=\"apDifficulty\">难度</label>",
+                "<label for=\"apGrade\">适用年级</label>",
+                "<label for=\"apTags\">知识点</label>",
+                "<label for=\"apStem\">题干</label>",
+                "<label for=\"apExplanation\">解析</label>",
+                "<label for=\"apOrigin\">来源类型</label>",
+                "<label for=\"apChangeNote\">变更说明</label>");
+
+        // 存草稿与发布是两个独立动作，发布按钮不靠禁用来表达「来源没填齐」
+        assertThat(html).contains("id=\"apSaveDraft\">保存草稿", "id=\"apPublish\">发布");
+        assertThat(js).contains("saveAdminProblem(false)", "saveAdminProblem(true)");
+    }
+
+    @Test
+    void failedAdminSubmitFocusesLinkedErrorSummary() throws IOException {
+        String html = resource("static/index.html");
+        String css = resource("static/app.css");
+        String js = resource("static/app.js");
+
+        // 错误摘要要能被读屏播报，也要能接收焦点
+        assertThat(html).contains("id=\"adminError\" role=\"alert\" tabindex=\"-1\" hidden");
+        assertThat(js).contains("function showAdminError", "box.focus()");
+        assertThat(css).contains(".form-error");
+    }
+
+    @Test
+    void adminAnswerControlsFollowProblemTypeWithAccessibleNames() throws IOException {
+        String js = resource("static/app.js");
+
+        // 题型切换后重建答案区：选择题给键位勾选，判断题给是/否，多空题按空分行
+        assertThat(js).contains(
+                "$('#apType').onchange",
+                "renderAdminAnswerArea",
+                "aria-label=\"把选项 ${key} 设为正确答案\"",
+                "aria-label=\"选项 ${key} 的内容\"",
+                "name=\"apJudge\"",
+                "data-blank-input");
+        // 来源类型驱动发布前必填项，和后端闸门一一对应
+        assertThat(js).contains("SOURCE_EXTRA", "rewriteNote", "licenseRef", "sourceUrl");
+    }
+
     private static String resource(String path) throws IOException {
         return new ClassPathResource(path).getContentAsString(StandardCharsets.UTF_8);
     }
