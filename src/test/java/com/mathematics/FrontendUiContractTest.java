@@ -46,6 +46,25 @@ class FrontendUiContractTest {
         assertThat(js).contains("setAttribute('aria-pressed'");
     }
 
+    @Test
+    void statusColorsFollowThemeInsteadOfFixedGreenRed() throws IOException {
+        String css = resource("static/app.css");
+        String js = resource("static/app.js");
+
+        // 温暖主题：靛蓝表示正确，陶土表示错误
+        assertThat(css).contains(
+                "--ok: #5F6F9A", "--ok-bg: #EFF1F7", "--ok-ink: #4F5D87",
+                "--bad: #A86452", "--bad-bg: #F8EEEA", "--bad-ink: #8E4F3E");
+        // 炫酷主题：青蓝表示正确，琥珀表示错误
+        assertThat(css).contains(
+                "--ok: #287A8B", "--ok-bg: #E8F3F5", "--ok-ink: #1F6272",
+                "--bad: #9D6214", "--bad-bg: #FAF1E3", "--bad-ink: #8A5613");
+        // 旧的绿/红不再出现
+        assertThat(css).doesNotContain("#8CA88A", "#B58585", "#5F8D6A", "#A96C6C");
+        // 颜色不是唯一信息载体：文字结论与 ✓/✗ 都保留
+        assertThat(js).contains("RESULT_NAME[result.result]", "'✓' : '✗'");
+    }
+
     private static String resource(String path) throws IOException {
         return new ClassPathResource(path).getContentAsString(StandardCharsets.UTF_8);
     }
