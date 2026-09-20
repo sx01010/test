@@ -79,6 +79,26 @@ class FrontendUiContractTest {
     }
 
     @Test
+    void wrongAnswerMarksOnlyTheStudentsOwnChoice() throws IOException {
+        String js = resource("static/app.js");
+
+        // 判分后不再去取标准答案。答错时把正确选项亮出来等于替学生填答案，
+        // 「重新作答」就只剩照抄。函数保持同步，没有网络调用，答案无从泄露。
+        assertThat(js).contains("function markObjectiveOptions(result) {");
+        assertThat(js).doesNotContain("async function markObjectiveOptions");
+        assertThat(js).doesNotContain("answer = (await api(`/problems/${problem.id}/explanation`)).answerJson");
+
+        // 只标学生自己勾的那一项，对错由判分结果决定
+        assertThat(js).contains(
+                "const mark = result.result === 'CORRECT' ? 'right' : 'wrong'",
+                "$$('#answerZone .opt.on').forEach(option => option.classList.add(mark))");
+
+        // 标准答案只有「查看解析」这一条出口，整份脚本里解析接口只被请求一次
+        assertThat(js).containsOnlyOnce("/explanation");
+        assertThat(js).contains("function revealStandardOptions", "revealStandardOptions(payload.answerJson)");
+    }
+
+    @Test
     void adminEntryIsRoleGatedAndFormFieldsAreLabelled() throws IOException {
         String html = resource("static/index.html");
         String js = resource("static/app.js");

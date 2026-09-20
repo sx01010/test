@@ -705,24 +705,26 @@ function renderResult(result, fresh) {
 }
 
 /**
- * 客观题提交后把正确选项标出来。标准答案来自解析接口，
- * 没开练习模式就直接取；开了练习模式此刻也已经提交过，同样能取到。
+ * 判分后只标学生自己勾的那一项：对了标对，错了标错。
+ *
+ * 这里刻意不去取标准答案。答错时顺手把正确选项亮出来，等于替学生把答案填上，
+ * 「重新作答」就只剩照抄一遍。答案改由「查看解析」揭晓——既然根本不请求，
+ * 开发者工具里也翻不出来。
  */
-async function markObjectiveOptions(result) {
-  const problem = S.current;
-  if (problem.type !== 'SINGLE' && problem.type !== 'MULTI' && problem.type !== 'JUDGE') return;
-  let answer;
-  try {
-    answer = (await api(`/problems/${problem.id}/explanation`)).answerJson;
-  } catch {
-    return;
-  }
-  const standard = problem.type === 'SINGLE' ? [answer.choice]
-    : problem.type === 'MULTI' ? answer.choices : [String(answer.value)];
+function markObjectiveOptions(result) {
+  const mark = result.result === 'CORRECT' ? 'right' : 'wrong';
+  $$('#answerZone .opt.on').forEach(option => option.classList.add(mark));
+}
+
+/** 看过解析之后才揭晓正确选项，此时解析正文已经把答案讲开了。 */
+function revealStandardOptions(answerJson) {
+  const type = S.current.type;
+  if (type !== 'SINGLE' && type !== 'MULTI' && type !== 'JUDGE') return;
+  const answer = answerJson || {};
+  const standard = type === 'SINGLE' ? [answer.choice]
+    : type === 'MULTI' ? (answer.choices || []) : [String(answer.value)];
   $$('#answerZone .opt').forEach(option => {
-    const value = option.dataset.key || option.dataset.value;
-    if (standard.includes(value)) option.classList.add('right');
-    else if (option.classList.contains('on')) option.classList.add('wrong');
+    if (standard.includes(option.dataset.key || option.dataset.value)) option.classList.add('right');
   });
 }
 
@@ -734,6 +736,7 @@ async function showExplanation() {
     target.innerHTML = `<div class="explain"><h4>解析</h4>${md(payload.explanationMd)}
       <p class="muted" style="font-size:13px;margin-top:10px">标准答案：<code>${esc(JSON.stringify(payload.answerJson))}</code></p></div>`;
     $('#bubble').hidden = true;
+    revealStandardOptions(payload.answerJson);
     typeset(target);
   } catch (error) {
     if (error.code === 'CONTENT_NOT_VISIBLE') {
