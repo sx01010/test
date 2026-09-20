@@ -51,16 +51,16 @@ class FrontendUiContractTest {
         String css = resource("static/app.css");
         String js = resource("static/app.js");
 
-        // 温暖主题：靛蓝表示正确，陶土表示错误
+        // 温暖主题：橄榄苔绿表示正确，赭红表示错误，都在大地色系内
         assertThat(css).contains(
-                "--ok: #5F6F9A", "--ok-bg: #EFF1F7", "--ok-ink: #4F5D87",
-                "--bad: #A86452", "--bad-bg: #F8EEEA", "--bad-ink: #8E4F3E");
-        // 炫酷主题：青蓝表示正确，琥珀表示错误
+                "--ok: #687A38", "--ok-bg: #F3F2E4", "--ok-ink: #55632C",
+                "--bad: #A8503C", "--bad-bg: #F9EBE7", "--bad-ink: #8E4030");
+        // 炫酷主题：松青绿表示正确，莓红表示错误，都在冷色系内
         assertThat(css).contains(
-                "--ok: #287A8B", "--ok-bg: #E8F3F5", "--ok-ink: #1F6272",
-                "--bad: #9D6214", "--bad-bg: #FAF1E3", "--bad-ink: #8A5613");
-        // 旧的绿/红不再出现
-        assertThat(css).doesNotContain("#8CA88A", "#B58585", "#5F8D6A", "#A96C6C");
+                "--ok: #2A7A6B", "--ok-bg: #E6F2EF", "--ok-ink: #1E6154",
+                "--bad: #A8435B", "--bad-bg: #FAEAEE", "--bad-ink: #8C3449");
+        // 不允许再出现跨色系借来的色相：暖主题里的靛蓝、冷主题里的琥珀
+        assertThat(css).doesNotContain("#5F6F9A", "#9D6214");
         // 颜色不是唯一信息载体：文字结论与 ✓/✗ 都保留
         assertThat(js).contains("RESULT_NAME[result.result]", "'✓' : '✗'");
     }

@@ -8,9 +8,9 @@
   --line: #EBE1D5; --line-strong: #C9B7A2;
   --accent: #B0764E; --accent-deep: #8E5C39; --accent-soft: #F4EBE2; --on-accent: #FFFFFF;
   --second: #A8946B; --second-soft: #F2EEE2;
-  /* 正确用靛蓝、错误用陶土，比绿/红更贴合暖色基底；深色版本用于白字底 */
-  --ok: #5F6F9A; --ok-bg: #EFF1F7; --ok-ink: #4F5D87;
-  --bad: #A86452; --bad-bg: #F8EEEA; --bad-ink: #8E4F3E;
+  /* 对错都留在大地色系内：橄榄苔绿对、赭红错。--ok/--bad 要承载白字，深度不能再浅 */
+  --ok: #687A38; --ok-bg: #F3F2E4; --ok-ink: #55632C;
+  --bad: #A8503C; --bad-bg: #F9EBE7; --bad-ink: #8E4030;
   --radius: 18px; --radius-sm: 13px; --bw: 1.5px;
   --shadow: 3px 3px 0 rgba(201, 183, 162, .38); --shadow-sm: 2px 2px 0 rgba(201, 183, 162, .34);
   --heading-weight: 700; --tracking: .01em; --dot: 24px;
@@ -25,9 +25,9 @@
   --line: #E2E7EF; --line-strong: #48546A;
   --accent: #4F6C96; --accent-deep: #3B5378; --accent-soft: #EDF1F7; --on-accent: #FFFFFF;
   --second: #5E8B8B; --second-soft: #EDF3F3;
-  /* 正确用青蓝、错误用琥珀，配合冷灰基底；深色版本用于白字底 */
-  --ok: #287A8B; --ok-bg: #E8F3F5; --ok-ink: #1F6272;
-  --bad: #9D6214; --bad-bg: #FAF1E3; --bad-ink: #8A5613;
+  /* 对错都留在冷色系内：松青绿对、莓红错。青绿比 accent 的藏蓝更偏绿，避免和主按钮混 */
+  --ok: #2A7A6B; --ok-bg: #E6F2EF; --ok-ink: #1E6154;
+  --bad: #A8435B; --bad-bg: #FAEAEE; --bad-ink: #8C3449;
   --radius: 13px; --radius-sm: 10px; --bw: 1.8px;
   --shadow: 4px 4px 0 rgba(72, 84, 106, .26); --shadow-sm: 3px 3px 0 rgba(72, 84, 106, .22);
   --heading-weight: 800; --tracking: -.015em; --dot: 34px;
