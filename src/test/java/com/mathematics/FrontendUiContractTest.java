@@ -99,6 +99,24 @@ class FrontendUiContractTest {
     }
 
     @Test
+    void standardAnswerReadsAsTextNotRawJson() throws IOException {
+        String js = resource("static/app.js");
+
+        // 不再把答案 JSON 原样塞进页面：{"choice":"B"} 对一个六年级学生没有任何意义
+        assertThat(js).doesNotContain("JSON.stringify(payload.answerJson)");
+        assertThat(js).contains("function formatStandardAnswer(type, answerJson)");
+
+        // 五种题型各自翻成人话
+        assertThat(js).contains(
+                "const JUDGE_ANSWER = { true: '正确', false: '错误' }",
+                "if (type === 'SINGLE') return answer.choice",
+                "(answer.choices || []).join('、')",
+                "JUDGE_ANSWER[answer.value]",
+                "`第 ${index + 1} 空 ${aliases[0]}`");
+        assertThat(js).contains("标准答案：<strong>${esc(standardText)}</strong>");
+    }
+
+    @Test
     void adminEntryIsRoleGatedAndFormFieldsAreLabelled() throws IOException {
         String html = resource("static/index.html");
         String js = resource("static/app.js");

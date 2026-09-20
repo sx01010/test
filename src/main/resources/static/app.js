@@ -11,6 +11,7 @@ const LEVEL_NAME = { 2: '入门', 3: '进阶', 4: '挑战' };
 const ORIGIN_NAME = { ORIGINAL: '原创', ADAPTED: '改编', LICENSED: '已授权', PUBLIC: '公开来源' };
 const RESULT_NAME = { CORRECT: '回答正确', PARTIAL: '部分正确', WRONG: '回答错误' };
 const STATUS_NAME = { DRAFT: '草稿', PUBLISHED: '已发布', HIDDEN: '已隐藏' };
+const JUDGE_ANSWER = { true: '正确', false: '错误' };
 const KEYS = ['A', 'B', 'C', 'D', 'E', 'F'];
 // 来源类型决定发布前还要补哪一个字段，和后端 AdminProblemService 的闸门一一对应
 const SOURCE_EXTRA = {
@@ -716,6 +717,19 @@ function markObjectiveOptions(result) {
   $$('#answerZone .opt.on').forEach(option => option.classList.add(mark));
 }
 
+/** 标准答案是给人看的，不是给机器看的：{"choice":"B"} 对一个六年级学生没有任何意义。 */
+function formatStandardAnswer(type, answerJson) {
+  const answer = answerJson || {};
+  if (type === 'SINGLE') return answer.choice || '';
+  if (type === 'MULTI') return (answer.choices || []).join('、');
+  if (type === 'JUDGE') return JUDGE_ANSWER[answer.value] || '';
+  // 多空题每空存着一组可接受写法，取第一个当标准写法报出来
+  if (type === 'BLANK') {
+    return (answer.blanks || []).map((aliases, index) => `第 ${index + 1} 空 ${aliases[0]}`).join('；');
+  }
+  return answer.value == null ? '' : String(answer.value);
+}
+
 /** 看过解析之后才揭晓正确选项，此时解析正文已经把答案讲开了。 */
 function revealStandardOptions(answerJson) {
   const type = S.current.type;
@@ -733,8 +747,9 @@ async function showExplanation() {
   try {
     const payload = await api(`/problems/${problem.id}/explanation`);
     const target = $('#explainBox') || $('#resultBox');
+    const standardText = formatStandardAnswer(problem.type, payload.answerJson);
     target.innerHTML = `<div class="explain"><h4>解析</h4>${md(payload.explanationMd)}
-      <p class="muted" style="font-size:13px;margin-top:10px">标准答案：<code>${esc(JSON.stringify(payload.answerJson))}</code></p></div>`;
+      ${standardText ? `<p class="muted" style="font-size:13px;margin-top:10px">标准答案：<strong>${esc(standardText)}</strong></p>` : ''}</div>`;
     $('#bubble').hidden = true;
     revealStandardOptions(payload.answerJson);
     typeset(target);
