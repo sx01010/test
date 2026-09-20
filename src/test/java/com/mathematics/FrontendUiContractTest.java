@@ -65,6 +65,19 @@ class FrontendUiContractTest {
         assertThat(js).contains("RESULT_NAME[result.result]", "'✓' : '✗'");
     }
 
+    @Test
+    void partialResultUsesPaperBackgroundWithThemeColorStrip() throws IOException {
+        String css = resource("static/app.css");
+
+        assertThat(css).contains(
+                ".result.wait {",
+                "background: var(--paper)",
+                ".result.wait::before",
+                "background: var(--second)");
+        assertThat(css).doesNotContain(
+                ".result.wait { border-color: var(--second); background: var(--second-soft) }");
+    }
+
     private static String resource(String path) throws IOException {
         return new ClassPathResource(path).getContentAsString(StandardCharsets.UTF_8);
     }
