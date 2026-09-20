@@ -1,0 +1,1411 @@
+openapi: 3.0.3
+info:
+  title: mathematics API
+  version: 0.1.0
+  description: |
+    V1 最小 MVP：筛题 → 作答 → 即时判分 → 看解析 → 错题复练，外加来源清晰的 PDF 下载。
+    列表一律游标分页；提交带 Idempotency-Key；答案与解析永远走独立接口。
+servers:
+  - url: http://localhost:8080
+    description: local
+tags:
+  - name: identity
+  - name: problem
+  - name: practice
+  - name: quality
+  - name: material
+  - name: admin
+security:
+  - bearerAuth: []
+
+paths:
+  /api/v1/auth/register:
+    post:
+      tags: [identity]
+      operationId: register
+      summary: 注册
+      security: []
+      description: 邮箱或手机至少一项，密码不少于 8 位。不收集真实姓名、学校、年龄。匿名接口需限流。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '200':
+          description: 注册成功并签发令牌
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+
+  /api/v1/auth/login:
+    post:
+      tags: [identity]
+      operationId: login
+      summary: 登录
+      security: []
+      description: 连续 5 次失败锁定 15 分钟。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+        '423':
+          description: 账号锁定
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+
+  /api/v1/auth/refresh:
+    post:
+      tags: [identity]
+      operationId: refreshToken
+      summary: 刷新令牌
+      security: []
+      description: 旧 refresh token 立即作废。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          description: 新的令牌对
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          $ref: '#/components/responses/Error'
+
+  /api/v1/auth/logout:
+    post:
+      tags: [identity]
+      operationId: logout
+      summary: 登出
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          description: 已登出
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OkResponse'
+
+  /api/v1/users/me:
+    get:
+      tags: [identity]
+      operationId: getMe
+      summary: 我的信息
+      responses:
+        '200':
+          description: 当前用户
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '401':
+          $ref: '#/components/responses/Error'
+    patch:
+      tags: [identity]
+      operationId: updateMe
+      summary: 改资料与偏好
+      description: practiceMode 控制解析可见策略。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileRequest'
+      responses:
+        '200':
+          description: 最新资料
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '400':
+          $ref: '#/components/responses/Error'
+
+  /api/v1/tags:
+    get:
+      tags: [problem]
+      operationId: listTags
+      summary: 知识点树
+      security: []
+      responses:
+        '200':
+          description: 整棵树，可缓存
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TagNode'
+
+  /api/v1/problems:
+    get:
+      tags: [problem]
+      operationId: searchProblems
+      summary: 搜索题目
+      security: []
+      description: 题型多选，叠加知识点、难度、年级、来源类型与关键词；游标分页。
+      parameters:
+        - in: query
+          name: type
+          schema:
+            type: string
+            example: SINGLE,BLANK
+          description: 逗号分隔的题型
+        - in: query
+          name: tagId
+          schema:
+            type: integer
+            format: int64
+        - in: query
+          name: difficulty
+          schema:
+            type: integer
+            enum: [2, 3, 4]
+        - in: query
+          name: grade
+          schema:
+            type: string
+        - in: query
+          name: origin
+          schema:
+            $ref: '#/components/schemas/ProblemOriginType'
+        - in: query
+          name: q
+          schema:
+            type: string
+          description: 标题与题干 ngram 关键词
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: 题目摘要游标页
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemSummaryPage'
+
+  /api/v1/problems/{id}:
+    get:
+      tags: [problem]
+      operationId: getProblem
+      summary: 题目详情
+      security: []
+      description: 不含答案与解析。versionId 供提交使用。
+      parameters:
+        - $ref: '#/components/parameters/ProblemId'
+      responses:
+        '200':
+          description: 题目详情
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '404':
+          $ref: '#/components/responses/Error'
+
+  /api/v1/problems/{id}/explanation:
+    get:
+      tags: [problem]
+      operationId: getExplanation
+      summary: 解析与标准答案
+      security: []
+      description: |
+        默认随时可看，匿名也可以看。带上登录态时，若用户开启练习模式且该题尚无提交，
+        返回 CONTENT_NOT_VISIBLE。按用户与 IP 限流。
+      parameters:
+        - $ref: '#/components/parameters/ProblemId'
+      responses:
+        '200':
+          description: 解析
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExplanationResponse'
+        '403':
+          description: 练习模式未提交
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+              example:
+                code: CONTENT_NOT_VISIBLE
+                message: 请先提交再查看解析
+        '429':
+          $ref: '#/components/responses/Error'
+
+  /api/v1/problems/{id}/similar:
+    get:
+      tags: [problem]
+      operationId: listSimilarProblems
+      summary: 相似题
+      security: []
+      description: 同知识点、难度 ±1；登录时排除近期做对的题，不足时放宽难度。
+      parameters:
+        - $ref: '#/components/parameters/ProblemId'
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 5
+            minimum: 1
+            maximum: 10
+      responses:
+        '200':
+          description: 相似题列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SimilarProblem'
+
+  /api/v1/submissions:
+    post:
+      tags: [practice]
+      operationId: createSubmission
+      summary: 提交作答
+      description: 进入题目时前端生成 UUID 作为 Idempotency-Key；重试复用，重新作答换新值。
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSubmissionRequest'
+      responses:
+        '200':
+          description: 即时判分结果；幂等命中时返回原结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmissionResult'
+        '409':
+          description: 题目已升版
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+              example:
+                code: PROBLEM_VERSION_STALE
+                message: 题目已更新，请刷新后重试
+        '400':
+          $ref: '#/components/responses/Error'
+
+  /api/v1/submissions/{id}:
+    get:
+      tags: [practice]
+      operationId: getSubmission
+      summary: 提交详情
+      description: 仅本人可看。含版本号与是否已升版。
+      parameters:
+        - $ref: '#/components/parameters/SubmissionId'
+      responses:
+        '200':
+          description: 答案快照与判题结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmissionDetail'
+        '403':
+          $ref: '#/components/responses/Error'
+        '404':
+          $ref: '#/components/responses/Error'
+
+  /api/v1/me/submissions:
+    get:
+      tags: [practice]
+      operationId: listMySubmissions
+      summary: 我的提交
+      parameters:
+        - in: query
+          name: problemId
+          schema:
+            type: integer
+            format: int64
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: 提交游标页
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmissionSummaryPage'
+
+  /api/v1/me/wrong-items:
+    get:
+      tags: [practice]
+      operationId: listWrongItems
+      summary: 错题本
+      description: 默认只看未掌握。可按知识点和加入时间筛选。
+      parameters:
+        - in: query
+          name: mastered
+          schema:
+            type: integer
+            enum: [0, 1]
+            default: 0
+        - in: query
+          name: tagId
+          schema:
+            type: integer
+            format: int64
+        - in: query
+          name: since
+          schema:
+            type: string
+            enum: [today, 7d, all]
+            default: all
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: 错题游标页
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WrongItemPage'
+
+  /api/v1/me/wrong-items/{problemId}:
+    patch:
+      tags: [practice]
+      operationId: markWrongItem
+      summary: 标记掌握
+      description: 手动覆盖自动判定。
+      parameters:
+        - in: path
+          name: problemId
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MarkMasteredRequest'
+      responses:
+        '200':
+          description: 更新后的掌握状态
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarkMasteredResponse'
+        '404':
+          $ref: '#/components/responses/Error'
+
+  /api/v1/me/progress:
+    get:
+      tags: [practice]
+      operationId: getMyProgress
+      summary: 知识点进度
+      description: 弱项排前，供个人页图表。
+      responses:
+        '200':
+          description: 按正确率升序
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TagProgress'
+
+  /api/v1/problems/{id}/feedback:
+    post:
+      tags: [quality]
+      operationId: createFeedback
+      summary: 题目纠错
+      description: 同一人同题未结案时返回已有工单。按用户限流。
+      parameters:
+        - $ref: '#/components/parameters/ProblemId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateFeedbackRequest'
+      responses:
+        '200':
+          description: 新建或已有 OPEN 工单
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeedbackCreated'
+        '429':
+          $ref: '#/components/responses/Error'
+
+  /api/v1/admin/problems:
+    post:
+      tags: [admin]
+      operationId: upsertProblem
+      summary: 录入或升版题目
+      description: 已发布题的内容变更生成新 version_no。来源字段不齐不能发布。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpsertProblemRequest'
+      responses:
+        '200':
+          description: 题目与版本
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpsertProblemResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+
+  /api/v1/admin/problems/import:
+    post:
+      tags: [admin]
+      operationId: importProblems
+      summary: 批量导入
+      description: 逐行校验题型、答案格式与来源字段，失败行不阻塞其他行。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ImportProblemsRequest'
+      responses:
+        '200':
+          description: 分行结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImportProblemsResponse'
+        '403':
+          $ref: '#/components/responses/Error'
+
+  /api/v1/admin/feedback/{id}/resolve:
+    post:
+      tags: [admin]
+      operationId: resolveFeedback
+      summary: 处理纠错
+      description: FIXED + regrade 会回溯重判受影响提交并写审计日志。
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResolveFeedbackRequest'
+      responses:
+        '200':
+          description: 处理结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResolveFeedbackResponse'
+        '404':
+          $ref: '#/components/responses/Error'
+
+  /api/v1/materials:
+    get:
+      tags: [material]
+      operationId: listMaterials
+      summary: 筛选下载资料
+      security: []
+      description: 只返回 PUBLISHED，公开列表不暴露 objectKey。
+      parameters:
+        - in: query
+          name: type
+          schema:
+            $ref: '#/components/schemas/MaterialType'
+        - in: query
+          name: grade
+          schema:
+            type: string
+        - in: query
+          name: year
+          schema:
+            type: integer
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: 资料摘要游标页
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaterialSummaryPage'
+
+  /api/v1/materials/{id}/download-url:
+    post:
+      tags: [material]
+      operationId: createDownloadUrl
+      summary: 申请下载地址
+      description: 签名 URL 5 分钟有效，记录下载审计。仅 LICENSED / PUBLIC / OWNED 且已发布可下载。
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: 短期签名地址
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DownloadUrlResponse'
+        '404':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/Error'
+
+  /api/v1/admin/materials/upload-ticket:
+    post:
+      tags: [admin]
+      operationId: createUploadTicket
+      summary: 申请资料上传凭证
+      description: 仅 PDF、不超过 30 MB。上传后必须完成回调与扫描。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UploadTicketRequest'
+      responses:
+        '200':
+          description: 直传凭证
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadTicketResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+
+  /api/v1/admin/materials:
+    post:
+      tags: [admin]
+      operationId: upsertMaterial
+      summary: 登记或发布资料
+      description: 文件 scanStatus=CLEAN 且来源字段完整才可 PUBLISHED。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpsertMaterialRequest'
+      responses:
+        '200':
+          description: 资料状态
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpsertMaterialResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    ProblemId:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: integer
+        format: int64
+    SubmissionId:
+      in: path
+      name: id
+      required: true
+      schema:
+        type: integer
+        format: int64
+    Cursor:
+      in: query
+      name: cursor
+      schema:
+        type: string
+    Limit:
+      in: query
+      name: limit
+      schema:
+        type: integer
+        default: 20
+        minimum: 1
+        maximum: 50
+
+  responses:
+    Error:
+      description: 错误
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorBody'
+
+  schemas:
+    ProblemType:
+      type: string
+      enum: [SINGLE, MULTI, JUDGE, NUMERIC, BLANK]
+    ProblemOriginType:
+      type: string
+      enum: [ORIGINAL, ADAPTED, LICENSED, PUBLIC]
+    MaterialType:
+      type: string
+      enum: [PAPER, HANDOUT]
+    MaterialOriginType:
+      type: string
+      enum: [OWNED, LICENSED, PUBLIC]
+    PublishStatus:
+      type: string
+      enum: [DRAFT, PUBLISHED, HIDDEN]
+    GradeOutcome:
+      type: string
+      enum: [CORRECT, PARTIAL, WRONG]
+    FeedbackReason:
+      type: string
+      enum: [ANSWER_ERROR, TYPO, UNCLEAR, OTHER]
+    FeedbackStatus:
+      type: string
+      enum: [OPEN, FIXED, REJECTED]
+
+    ErrorBody:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: CONTENT_NOT_VISIBLE / PROBLEM_VERSION_STALE / ACCOUNT_LOCKED / VALIDATION_ERROR 等
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+
+    OkResponse:
+      type: object
+      required: [ok]
+      properties:
+        ok:
+          type: boolean
+          example: true
+
+    RegisterRequest:
+      type: object
+      required: [nickname, password]
+      properties:
+        nickname:
+          type: string
+          maxLength: 32
+        email:
+          type: string
+          format: email
+        phone:
+          type: string
+          maxLength: 20
+        password:
+          type: string
+          minLength: 8
+
+    LoginRequest:
+      type: object
+      required: [account, password]
+      properties:
+        account:
+          type: string
+          description: 邮箱或手机号
+        password:
+          type: string
+
+    RefreshRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+
+    TokenResponse:
+      type: object
+      required: [userId, accessToken, refreshToken]
+      properties:
+        userId:
+          type: integer
+          format: int64
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+
+    UserProfile:
+      type: object
+      required: [id, nickname, avatarPreset, role, practiceMode]
+      properties:
+        id:
+          type: integer
+          format: int64
+        nickname:
+          type: string
+        avatarPreset:
+          type: integer
+        role:
+          type: string
+          enum: [USER, ADMIN]
+        practiceMode:
+          type: boolean
+
+    UpdateProfileRequest:
+      type: object
+      properties:
+        nickname:
+          type: string
+          maxLength: 32
+        avatarPreset:
+          type: integer
+          minimum: 0
+        practiceMode:
+          type: boolean
+
+    TagNode:
+      type: object
+      required: [id, name, slug]
+      properties:
+        id:
+          type: integer
+          format: int64
+        parentId:
+          type: integer
+          format: int64
+          nullable: true
+        name:
+          type: string
+        slug:
+          type: string
+        sortOrder:
+          type: integer
+
+    ProblemSummary:
+      type: object
+      required: [id, title, type, difficulty, grade, versionId]
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        type:
+          $ref: '#/components/schemas/ProblemType'
+        difficulty:
+          type: integer
+        grade:
+          type: string
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/TagNode'
+        originType:
+          $ref: '#/components/schemas/ProblemOriginType'
+        versionId:
+          type: integer
+          format: int64
+
+    ProblemSummaryPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProblemSummary'
+        nextCursor:
+          type: string
+          nullable: true
+
+    ProblemOption:
+      type: object
+      required: [key, textMd]
+      properties:
+        key:
+          type: string
+          example: A
+        textMd:
+          type: string
+
+    ProblemSourcePublic:
+      type: object
+      properties:
+        originType:
+          $ref: '#/components/schemas/ProblemOriginType'
+        contestName:
+          type: string
+        year:
+          type: integer
+        round:
+          type: string
+
+    ProblemDetail:
+      type: object
+      required: [id, title, type, stemMd, tags, versionId]
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        type:
+          $ref: '#/components/schemas/ProblemType'
+        stemMd:
+          type: string
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProblemOption'
+        blankCount:
+          type: integer
+          description: |
+            仅 BLANK 题返回。前端靠它决定渲染几个输入框；
+            这是标准答案的长度而不是内容，不构成泄题。
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/TagNode'
+        source:
+          $ref: '#/components/schemas/ProblemSourcePublic'
+        difficulty:
+          type: integer
+        grade:
+          type: string
+        maxScore:
+          type: integer
+        versionId:
+          type: integer
+          format: int64
+        versionNo:
+          type: integer
+
+    ExplanationResponse:
+      type: object
+      required: [explanationMd, answerJson]
+      properties:
+        explanationMd:
+          type: string
+        answerJson:
+          $ref: '#/components/schemas/AnswerJson'
+
+    SimilarProblem:
+      type: object
+      required: [id, title, difficulty, sharedTagCount]
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        difficulty:
+          type: integer
+        sharedTagCount:
+          type: integer
+
+    AnswerJson:
+      description: |
+        与判题器约定一致。
+        SINGLE `{"choice":"A"}`；
+        MULTI `{"choices":["A","C"]}`；
+        JUDGE `{"value":true}`；
+        NUMERIC `{"value":"3.14"}`；
+        BLANK 用户 `{"blanks":["12","24"]}`，标准答案每个空可有多个写法 `{"blanks":[["12","十二"],["24"]]}`。
+      type: object
+      additionalProperties: true
+
+    GraderConfig:
+      type: object
+      properties:
+        tolerance:
+          type: number
+          description: NUMERIC 绝对容差，默认 0
+        orderIndependent:
+          type: boolean
+          description: BLANK 是否打乱空序匹配，默认 false
+
+    CreateSubmissionRequest:
+      type: object
+      required: [problemId, problemVersionId, answer]
+      properties:
+        problemId:
+          type: integer
+          format: int64
+        problemVersionId:
+          type: integer
+          format: int64
+        answer:
+          $ref: '#/components/schemas/AnswerJson'
+        durationMs:
+          type: integer
+          minimum: 0
+          description: 可选计时，不参与判分
+
+    SubmissionResult:
+      type: object
+      required: [id, result, score, maxScore]
+      properties:
+        id:
+          type: integer
+          format: int64
+        result:
+          $ref: '#/components/schemas/GradeOutcome'
+        score:
+          type: number
+          format: double
+        maxScore:
+          type: number
+          format: double
+        details:
+          type: object
+          additionalProperties: true
+          description: BLANK 含逐空对错
+
+    SubmissionDetail:
+      allOf:
+        - $ref: '#/components/schemas/SubmissionResult'
+        - type: object
+          required: [problemId, problemVersionId, versionNo, versionChanged, answer, createdAt]
+          properties:
+            problemId:
+              type: integer
+              format: int64
+            problemVersionId:
+              type: integer
+              format: int64
+            versionNo:
+              type: integer
+            versionChanged:
+              type: boolean
+              description: 题目已升版时为 true
+            answer:
+              $ref: '#/components/schemas/AnswerJson'
+            durationMs:
+              type: integer
+              nullable: true
+            createdAt:
+              type: string
+              format: date-time
+
+    SubmissionSummary:
+      type: object
+      required: [id, problemId, versionNo, versionChanged, result, score, maxScore, createdAt]
+      properties:
+        id:
+          type: integer
+          format: int64
+        problemId:
+          type: integer
+          format: int64
+        versionNo:
+          type: integer
+        versionChanged:
+          type: boolean
+        result:
+          $ref: '#/components/schemas/GradeOutcome'
+        score:
+          type: number
+          format: double
+        maxScore:
+          type: number
+          format: double
+        durationMs:
+          type: integer
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    SubmissionSummaryPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SubmissionSummary'
+        nextCursor:
+          type: string
+          nullable: true
+
+    WrongItem:
+      type: object
+      required: [problemId, title, mastered, wrongCount, lastWrongAt, versionChanged]
+      properties:
+        problemId:
+          type: integer
+          format: int64
+        title:
+          type: string
+        mastered:
+          type: boolean
+        wrongCount:
+          type: integer
+        consecutiveCorrect:
+          type: integer
+        lastWrongAt:
+          type: string
+          format: date-time
+        versionChanged:
+          type: boolean
+        lastVersionId:
+          type: integer
+          format: int64
+
+    WrongItemPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/WrongItem'
+        nextCursor:
+          type: string
+          nullable: true
+
+    MarkMasteredRequest:
+      type: object
+      required: [mastered]
+      properties:
+        mastered:
+          type: boolean
+
+    MarkMasteredResponse:
+      type: object
+      required: [problemId, mastered]
+      properties:
+        problemId:
+          type: integer
+          format: int64
+        mastered:
+          type: boolean
+
+    TagProgress:
+      type: object
+      required: [tagId, tagName, attemptCount, correctCount]
+      properties:
+        tagId:
+          type: integer
+          format: int64
+        tagName:
+          type: string
+        attemptCount:
+          type: integer
+        correctCount:
+          type: integer
+        lastSubmittedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    CreateFeedbackRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          $ref: '#/components/schemas/FeedbackReason'
+        detail:
+          type: string
+          maxLength: 500
+
+    FeedbackCreated:
+      type: object
+      required: [feedbackId, status]
+      properties:
+        feedbackId:
+          type: integer
+          format: int64
+        status:
+          $ref: '#/components/schemas/FeedbackStatus'
+        reused:
+          type: boolean
+          description: 命中未结案工单时为 true
+
+    ProblemSourceInput:
+      type: object
+      required: [originType]
+      properties:
+        originType:
+          $ref: '#/components/schemas/ProblemOriginType'
+        contestName:
+          type: string
+        year:
+          type: integer
+        round:
+          type: string
+        rewriteNote:
+          type: string
+          maxLength: 500
+          description: ADAPTED 发布时必填
+        licenseRef:
+          type: string
+          description: LICENSED 发布时必填
+        sourceUrl:
+          type: string
+          description: PUBLIC 发布时必填
+
+    UpsertProblemRequest:
+      type: object
+      required: [title, type, stemMd, answerJson, explanationMd, tagIds, source, difficulty, grade]
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: 已有题目升版时传入
+        title:
+          type: string
+          maxLength: 200
+        type:
+          $ref: '#/components/schemas/ProblemType'
+        difficulty:
+          type: integer
+          enum: [2, 3, 4]
+        grade:
+          type: string
+        stemMd:
+          type: string
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProblemOption'
+        answerJson:
+          $ref: '#/components/schemas/AnswerJson'
+        explanationMd:
+          type: string
+        graderConfig:
+          $ref: '#/components/schemas/GraderConfig'
+        maxScore:
+          type: integer
+          default: 100
+        tagIds:
+          type: array
+          items:
+            type: integer
+            format: int64
+        source:
+          $ref: '#/components/schemas/ProblemSourceInput'
+        changeNote:
+          type: string
+          maxLength: 256
+        publish:
+          type: boolean
+          default: false
+
+    UpsertProblemResponse:
+      type: object
+      required: [id, versionNo]
+      properties:
+        id:
+          type: integer
+          format: int64
+        versionNo:
+          type: integer
+        status:
+          $ref: '#/components/schemas/PublishStatus'
+
+    ImportProblemsRequest:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/UpsertProblemRequest'
+
+    ImportFailure:
+      type: object
+      required: [line, reason]
+      properties:
+        line:
+          type: integer
+        reason:
+          type: string
+
+    ImportProblemsResponse:
+      type: object
+      required: [succeeded, failed]
+      properties:
+        succeeded:
+          type: integer
+        failed:
+          type: array
+          items:
+            $ref: '#/components/schemas/ImportFailure'
+
+    ResolveFeedbackRequest:
+      type: object
+      required: [decision]
+      properties:
+        decision:
+          type: string
+          enum: [FIXED, REJECTED]
+        newVersion:
+          $ref: '#/components/schemas/UpsertProblemRequest'
+        regrade:
+          type: boolean
+          default: false
+        remark:
+          type: string
+          maxLength: 256
+
+    ResolveFeedbackResponse:
+      type: object
+      required: [status, regradedCount]
+      properties:
+        status:
+          $ref: '#/components/schemas/FeedbackStatus'
+        regradedCount:
+          type: integer
+
+    MaterialSummary:
+      type: object
+      required: [id, title, type, originType]
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        type:
+          $ref: '#/components/schemas/MaterialType'
+        grade:
+          type: string
+        year:
+          type: integer
+        originType:
+          $ref: '#/components/schemas/MaterialOriginType'
+
+    MaterialSummaryPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/MaterialSummary'
+        nextCursor:
+          type: string
+          nullable: true
+
+    DownloadUrlResponse:
+      type: object
+      required: [url, expiresAt]
+      properties:
+        url:
+          type: string
+          format: uri
+        expiresAt:
+          type: string
+          format: date-time
+
+    UploadTicketRequest:
+      type: object
+      required: [fileName, mimeType, sizeBytes, sha256]
+      properties:
+        fileName:
+          type: string
+        mimeType:
+          type: string
+          enum: [application/pdf]
+        sizeBytes:
+          type: integer
+          format: int64
+          maximum: 31457280
+        sha256:
+          type: string
+          minLength: 64
+          maxLength: 64
+
+    UploadTicketResponse:
+      type: object
+      required: [objectKey, uploadUrl, expiresAt]
+      properties:
+        objectKey:
+          type: string
+        uploadUrl:
+          type: string
+          format: uri
+        expiresAt:
+          type: string
+          format: date-time
+
+    UpsertMaterialRequest:
+      type: object
+      required: [title, type, originType, objectKey]
+      properties:
+        title:
+          type: string
+          maxLength: 200
+        type:
+          $ref: '#/components/schemas/MaterialType'
+        grade:
+          type: string
+        year:
+          type: integer
+        originType:
+          $ref: '#/components/schemas/MaterialOriginType'
+        licenseRef:
+          type: string
+        sourceUrl:
+          type: string
+        objectKey:
+          type: string
+        publish:
+          type: boolean
+          default: false
+
+    UpsertMaterialResponse:
+      type: object
+      required: [id, status]
+      properties:
+        id:
+          type: integer
+          format: int64
+        status:
+          $ref: '#/components/schemas/PublishStatus'

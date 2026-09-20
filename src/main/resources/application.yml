@@ -2,8 +2,36 @@ spring:
   application:
     name: mathematics
 
+  # 默认 profile 用内存 H2，clone 下来 mvn spring-boot:run 就能直接跑通刷题闭环。
+  # 正式环境用 -Dspring.profiles.active=mysql 切到 MySQL 8。
+  datasource:
+    url: jdbc:h2:mem:mathematics;MODE=MySQL;DATABASE_TO_LOWER=TRUE;NON_KEYWORDS=USER,YEAR,VALUE;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+
+  flyway:
+    # {vendor} 解析成 h2 或 mysql：题干全文索引、JSON 列、生成列只在 MySQL 脚本里。
+    # 开发 profile 额外挂 seed 目录，灌入知识点树与 5 道示例题。
+    locations: classpath:db/migration/{vendor},classpath:db/seed/{vendor}
+
+  jackson:
+    default-property-inclusion: non_null
+
 server:
   port: 8080
+
+mathematics:
+  practice:
+    # R12：连续做对几次自动标记已掌握，规格要求做成配置项
+    mastery-threshold: 2
+  auth:
+    access-token-ttl: PT2H
+    refresh-token-ttl: P30D
+    max-login-failures: 5
+    lock-duration: PT15M
+  dev:
+    # 开发环境自动建一个演示账号 demo@mathematics.local / demo12345
+    seed-demo-user: true
 
 management:
   endpoints:
@@ -13,3 +41,7 @@ management:
   endpoint:
     health:
       show-details: never
+
+logging:
+  level:
+    com.mathematics: INFO

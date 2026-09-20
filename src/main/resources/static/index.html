@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mathematics · 小学奥数刷题</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="app.css">
+</head>
+<body data-theme="cool">
+<div class="wrap">
+
+  <header>
+    <div class="logo">
+      <span class="logo-mark">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+             stroke-linecap="round" style="stroke:var(--accent-deep)">
+          <path d="M5 7h14M5 12h8M5 17h11"/>
+        </svg>
+      </span>
+      mathematics
+    </div>
+    <nav id="nav">
+      <a data-view="problems" class="on">题库</a>
+      <a data-view="me">我的练习</a>
+    </nav>
+    <label class="search">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+        <circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>
+      </svg>
+      <input id="kw" placeholder="搜索题目标题或题干">
+    </label>
+    <div class="theme-switch" id="themeSwitch">
+      <button data-theme-btn="warm">温暖柔和</button>
+      <button data-theme-btn="cool" class="on">炫酷高级</button>
+    </div>
+    <button class="btn" id="btnLogin">登录</button>
+    <div class="avatar" id="avatar" hidden></div>
+  </header>
+
+  <!-- ============ 题库 ============ -->
+  <div id="view-problems">
+    <div class="filters">
+      <label class="filter-field">
+        <span>题型</span>
+        <select id="typeFilter" class="filter-select">
+          <option value="">全部题型</option>
+          <option value="SINGLE">单选</option>
+          <option value="MULTI">多选</option>
+          <option value="JUDGE">判断</option>
+          <option value="NUMERIC">填空</option>
+          <option value="BLANK">多空填空</option>
+        </select>
+      </label>
+      <label class="filter-field">
+        <span>知识点</span>
+        <select id="tagFilter" class="filter-select">
+          <option value="">全部知识点</option>
+        </select>
+      </label>
+      <span class="sep"></span>
+      <span class="filter-label">难度</span>
+      <span class="chip" data-difficulty="2">入门</span>
+      <span class="chip" data-difficulty="3">进阶</span>
+      <span class="chip" data-difficulty="4">挑战</span>
+    </div>
+
+    <div class="grid">
+      <main>
+        <section class="card solve">
+          <div class="solve-in" id="solve">
+            <div class="empty">正在加载题目…</div>
+          </div>
+        </section>
+
+        <div class="sec-head"><h2>题目列表</h2><span id="listCount"></span></div>
+        <div class="list" id="list"></div>
+        <div class="more"><button class="btn" id="btnMore" hidden>加载更多</button></div>
+      </main>
+
+      <aside>
+        <section class="card panel">
+          <div class="eyebrow">Today</div>
+          <h3>今日练习</h3>
+          <div class="ring-wrap">
+            <svg class="ring" viewBox="0 0 100 100">
+              <circle class="bg" cx="50" cy="50" r="45"/>
+              <circle class="fg" id="ring" cx="50" cy="50" r="45" stroke-dashoffset="283"/>
+            </svg>
+            <div>
+              <div class="ring-num"><span id="doneNum">0</span> / 20</div>
+              <div class="ring-cap">正确率 <span id="rate">—</span><br>错题待复习 <span id="wrongNum">0</span></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card panel">
+          <div class="eyebrow">Timer</div>
+          <h3>计时方式</h3>
+          <div class="mode" id="mode">
+            <span class="chip" data-mode="NONE">不计时</span>
+            <span class="chip on" data-mode="PER_PROBLEM">单题计时</span>
+          </div>
+          <p class="hint" id="modeHint">单题计时：每换一道题重新计时，只随提交上报耗时，不影响判分。</p>
+        </section>
+
+        <section class="card panel">
+          <div class="eyebrow">Similar</div>
+          <h3>相似题推荐</h3>
+          <div class="rec" id="recList"><p class="hint">同知识点、难度相近，已做对的会自动排除。</p></div>
+        </section>
+      </aside>
+    </div>
+  </div>
+
+  <!-- ============ 我的练习 ============ -->
+  <div id="view-me" hidden>
+    <div class="stat-grid">
+      <section class="card stat"><div class="stat-num" id="meDone">0</div><div class="stat-cap">今日已练</div></section>
+      <section class="card stat"><div class="stat-num" id="meRate">—</div><div class="stat-cap">今日正确率</div></section>
+      <section class="card stat"><div class="stat-num" id="meWrong">0</div><div class="stat-cap">错题待复习</div></section>
+      <section class="card stat"><div class="stat-num" id="meTags">0</div><div class="stat-cap">练过的知识点</div></section>
+    </div>
+
+    <div class="sec-head"><h2>错题本</h2><span id="wrongCount"></span></div>
+    <div class="filters" id="wrongFilters" style="margin-top:0">
+      <span class="filter-label">状态</span>
+      <span class="chip on" data-wf="mastered" data-v="0">待复习</span>
+      <span class="chip" data-wf="mastered" data-v="1">已掌握</span>
+      <span class="sep"></span>
+      <span class="filter-label">加入时间</span>
+      <span class="chip on" data-wf="since" data-v="all">全部</span>
+      <span class="chip" data-wf="since" data-v="today">今天</span>
+      <span class="chip" data-wf="since" data-v="7d">最近 7 天</span>
+      <span class="sep"></span>
+      <span class="filter-label">知识点</span>
+      <span id="wrongTagFilters" style="display:flex;flex-wrap:wrap;gap:8px"></span>
+    </div>
+    <div class="list" id="wrongList"></div>
+
+    <div class="sec-head"><h2>知识点掌握度</h2><span>按正确率升序，弱项排前面</span></div>
+    <section class="card panel" id="progressPanel"></section>
+
+    <div class="sec-head"><h2>最近提交</h2><span>同一次重试复用同一个 Idempotency-Key，不会重复计分</span></div>
+    <div class="list" id="submissionList"></div>
+  </div>
+
+  <footer>判分、错题归档与知识点统计全部在服务端完成 · 客观题即时判分，过程题不在 V1 范围内</footer>
+</div>
+
+<div id="toast"></div>
+<div id="mask" hidden></div>
+
+<script src="app.js"></script>
+</body>
+</html>
