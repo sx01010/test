@@ -60,11 +60,11 @@
           <option value="">全部知识点</option>
         </select>
       </label>
-      <span class="sep"></span>
-      <span class="filter-label">难度</span>
-      <span class="chip" data-difficulty="2">入门</span>
-      <span class="chip" data-difficulty="3">进阶</span>
-      <span class="chip" data-difficulty="4">挑战</span>
+      <div class="difficulty-filter" role="group" aria-label="难度筛选">
+        <button type="button" class="chip" data-difficulty="2" aria-pressed="false" aria-label="筛选入门难度">入门</button>
+        <button type="button" class="chip" data-difficulty="3" aria-pressed="false" aria-label="筛选进阶难度">进阶</button>
+        <button type="button" class="chip" data-difficulty="4" aria-pressed="false" aria-label="筛选挑战难度">挑战</button>
+      </div>
     </div>
 
     <div class="grid">

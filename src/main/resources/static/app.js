@@ -337,13 +337,16 @@ $('#typeFilter').onchange = event => {
   if (event.target.value) S.filter.types.add(event.target.value);
   refreshList();
 };
-$$('[data-difficulty]').forEach(chip => {
-  chip.onclick = () => {
-    const value = Number(chip.dataset.difficulty);
-    const turningOff = S.filter.difficulty === value;
-    $$('[data-difficulty]').forEach(other => other.classList.remove('on'));
-    S.filter.difficulty = turningOff ? null : value;
-    if (!turningOff) chip.classList.add('on');
+$$('[data-difficulty]').forEach(button => {
+  button.insertAdjacentHTML('afterbegin', levelIcon(Number(button.dataset.difficulty)));
+  button.onclick = () => {
+    const value = Number(button.dataset.difficulty);
+    S.filter.difficulty = S.filter.difficulty === value ? null : value;
+    $$('[data-difficulty]').forEach(other => {
+      const on = Number(other.dataset.difficulty) === S.filter.difficulty;
+      other.classList.toggle('on', on);
+      other.setAttribute('aria-pressed', String(on));
+    });
     refreshList();
   };
 });
