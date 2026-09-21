@@ -312,6 +312,14 @@ h1.q { font-size: 19.5px; line-height: 1.6; margin: 14px 0 0 }
 .material-row { cursor: default }
 .material-row:hover { transform: none }
 .admin-list a .btn { padding: 3px 10px; font-size: 12.5px }
+/* 批量导入是低频动作，默认折叠，别跟主表单抢注意力 */
+.import-box { margin-top: 16px; padding-top: 15px; border-top: 1.5px solid var(--line) }
+.import-box summary { cursor: pointer; font-size: 14px; color: var(--ink-soft); margin-bottom: 12px }
+.import-box textarea { font-family: ui-monospace, Consolas, monospace; font-size: 13px }
+.import-fail { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px }
+.import-fail th, .import-fail td { padding: 6px 9px; border-bottom: 1px solid var(--line); text-align: left }
+.import-fail th { color: var(--ink-soft); font-weight: 600 }
+.import-fail td:first-child { width: 64px; font-variant-numeric: tabular-nums }
 .admin-list a { align-items: flex-start; flex-wrap: wrap; gap: 7px }
 .admin-list .admin-row-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
 .admin-list small { color: var(--ink-soft); letter-spacing: 0; font-variant-numeric: tabular-nums }

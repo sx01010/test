@@ -1014,6 +1014,7 @@ function setupAdmin() {
   $('#apStatusFilter').onchange = refreshAdminList;
   setupFeedbackQueue();
   setupAdminMaterial();
+  $('#ipRun').onclick = runImport;
   $('#apReset').onclick = resetAdminForm;
   $('#apSaveDraft').onclick = () => saveAdminProblem(false);
   $('#apPublish').onclick = () => saveAdminProblem(true);
@@ -1446,6 +1447,56 @@ async function resolveFeedback(id) {
     $('#feedbackDetail').innerHTML = '<p class="hint">从右侧选下一条纠错。</p>';
   } catch (error) {
     showFeedbackResult(error.message);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+/* ========================= 批量导入 ========================= */
+
+function showImportResult(message) {
+  const box = $('#ipResult');
+  box.hidden = false;
+  box.textContent = message;
+  box.focus();
+}
+
+/**
+ * 失败行要列出行号与原因。只播报「成功 8 条，失败 2 条」不够——
+ * 内容组真正需要的是知道哪一行要改。
+ */
+function renderImportFailures(failed) {
+  $('#ipFailures').innerHTML = failed.length
+    ? `<table class="import-fail">
+        <caption class="field-hint" style="text-align:left">需要修改的条目</caption>
+        <thead><tr><th scope="col">行号</th><th scope="col">原因</th></tr></thead>
+        <tbody>${failed.map(row => `<tr><td>${row.line}</td><td>${esc(row.reason)}</td></tr>`).join('')}</tbody>
+      </table>`
+    : '';
+}
+
+async function runImport() {
+  let items;
+  try {
+    items = JSON.parse($('#ipJson').value);
+  } catch (error) {
+    return showImportResult(`JSON 解析失败：${error.message}`);
+  }
+  if (!Array.isArray(items) || !items.length) {
+    return showImportResult('请贴一个非空的题目数组');
+  }
+
+  const button = $('#ipRun');
+  button.disabled = true;
+  try {
+    const result = await api('/admin/problems/import', { method: 'POST', body: { items } });
+    showImportResult(result.failed.length
+      ? `成功 ${result.succeeded} 条，失败 ${result.failed.length} 条。失败的条目没有入库，改完可以只重贴这几条。`
+      : `全部导入成功，共 ${result.succeeded} 条。`);
+    renderImportFailures(result.failed);
+    await loadAdminList();
+  } catch (error) {
+    showImportResult(error.message);
   } finally {
     button.disabled = false;
   }

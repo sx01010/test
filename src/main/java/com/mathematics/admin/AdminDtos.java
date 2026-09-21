@@ -105,6 +105,23 @@ public final class AdminDtos {
     public record ResolveFeedbackResponse(long id, String status, Integer versionNo, int regradedCount) {
     }
 
+    /**
+     * A20 批量导入。
+     *
+     * <p>元素上**刻意不加** {@code @Valid}：级联校验会在进入方法之前就把整个请求判失败，
+     * 返回一个 400，那正好是「失败行阻塞其他行」——规格明确不要的行为。
+     * 字段校验改成在循环里手工调 Validator，粒度落到行。
+     */
+    public record ImportProblemsRequest(
+            @NotEmpty(message = "至少要有一条题目") List<UpsertProblemRequest> items) {
+    }
+
+    public record ImportFailure(int line, String reason) {
+    }
+
+    public record ImportProblemsResponse(int succeeded, List<ImportFailure> failed) {
+    }
+
     /** 纠错队列条目。带题目标题，免得管理员为了知道是哪道题再点一次。 */
     public record AdminFeedbackSummary(
             long id,

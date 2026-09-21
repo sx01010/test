@@ -191,6 +191,24 @@ class FrontendUiContractTest {
     }
 
     @Test
+    void bulkImportListsFailedLinesNotJustACount() throws IOException {
+        String html = resource("static/index.html");
+        String js = resource("static/app.js");
+
+        // 低频动作，默认折叠，别跟主表单抢注意力
+        assertThat(html).contains("<details class=\"import-box\">", "<label for=\"ipJson\">题目 JSON 数组</label>",
+                "id=\"ipResult\" role=\"alert\" tabindex=\"-1\" hidden");
+
+        // 内容组要知道哪一行要改，所以行号与原因都得列出来
+        assertThat(js).contains(
+                "function renderImportFailures",
+                "<th scope=\"col\">行号</th>",
+                "row.line",
+                "esc(row.reason)",
+                "失败的条目没有入库");
+    }
+
+    @Test
     void materialDownloadIsAnonymousAndUploadIsTwoStep() throws IOException {
         String html = resource("static/index.html");
         String js = resource("static/app.js");
