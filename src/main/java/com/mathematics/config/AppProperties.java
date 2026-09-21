@@ -14,10 +14,16 @@ public record AppProperties(Practice practice, Auth auth, Dev dev, Material mate
     }
 
     /**
-     * @param maxLoginFailures R02：连续失败多少次锁定账号
-     * @param lockDuration     锁定时长
+     * @param maxLoginFailures  R02：连续失败多少次锁定账号
+     * @param lockDuration      锁定时长
+     * @param resetCodeTtl      R20：验证码有效期，规格定 10 分钟
+     * @param resetCodeCooldown R20：同一账号多久才能再要一个码，规格定 1 分钟
+     * @param resetMaxAttempts  一个验证码最多猜错几次。六位数字若能无限猜，10 分钟足够轮询完
+     * @param logResetCodes     把验证码打到日志。V1 没有邮件与短信通道，mysql profile 必须关
      */
-    public record Auth(Duration accessTokenTtl, Duration refreshTokenTtl, int maxLoginFailures, Duration lockDuration) {
+    public record Auth(Duration accessTokenTtl, Duration refreshTokenTtl, int maxLoginFailures, Duration lockDuration,
+                       Duration resetCodeTtl, Duration resetCodeCooldown, int resetMaxAttempts,
+                       boolean logResetCodes) {
     }
 
     /**

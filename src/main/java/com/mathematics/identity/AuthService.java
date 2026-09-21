@@ -115,7 +115,8 @@ public class AuthService {
                 .map(user -> new CurrentUser(user.id(), user.role(), user.practiceMode()));
     }
 
-    private TokenResponse issuePair(long userId) {
+    /** 包内可见：{@link PasswordResetService} 重置成功后也要签发一对令牌。 */
+    TokenResponse issuePair(long userId) {
         LocalDateTime now = LocalDateTime.now();
         String access = randomToken();
         String refresh = randomToken();

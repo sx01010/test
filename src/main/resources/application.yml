@@ -35,6 +35,14 @@ mathematics:
     refresh-token-ttl: P30D
     max-login-failures: 5
     lock-duration: PT15M
+    # R20 找回密码：规格要求验证码 10 分钟失效、同一账号 1 分钟内只发一次
+    reset-code-ttl: PT10M
+    reset-code-cooldown: PT1M
+    # 规格没提这条，但它比有效期更要紧：六位数字能无限猜的话，10 分钟够轮询完
+    reset-max-attempts: 5
+    # V1 没有邮件与短信通道，验证码只能打到日志供开发自测。mysql profile 里关掉。
+    # 绝不放进响应体：那样任何人都能拿别人的邮箱要码然后直接改密码。
+    log-reset-codes: true
   dev:
     # 开发环境自动建一个演示账号 demo@mathematics.local / demo12345
     seed-demo-user: true

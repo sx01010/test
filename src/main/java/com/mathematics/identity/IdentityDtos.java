@@ -26,6 +26,25 @@ public final class IdentityDtos {
     public record RefreshRequest(@NotBlank String refreshToken) {
     }
 
+    /**
+     * R20：account 填注册时用的邮箱或手机号。
+     */
+    public record ResetCodeRequest(@NotBlank(message = "请填写邮箱或手机号") @Size(max = 128) String account) {
+    }
+
+    public record ResetPasswordRequest(
+            @NotBlank(message = "请填写邮箱或手机号") @Size(max = 128) String account,
+            @NotBlank(message = "请填写验证码") @Size(max = 16) String code,
+            @NotBlank @Size(min = 8, max = 72, message = "密码至少 8 位") String newPassword) {
+    }
+
+    /**
+     * 恒定 {@code sent=true}。故意不反映账号是否存在、是否还在冷却期，
+     * 否则这个接口就成了账号枚举器。
+     */
+    public record ResetCodeResponse(boolean sent) {
+    }
+
     public record TokenResponse(long userId, String accessToken, String refreshToken) {
     }
 

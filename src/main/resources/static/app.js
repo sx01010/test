@@ -245,6 +245,7 @@ function openAuthModal(mode) {
     ${isLogin ? '' : '<div class="field"><label>昵称</label><input id="authNickname" maxlength="32" placeholder="怎么称呼你"></div>'}
     <div class="field"><label>邮箱${isLogin ? '或手机号' : ''}</label><input id="authAccount" placeholder="demo@mathematics.local"></div>
     <div class="field"><label>密码（至少 8 位）</label><input id="authPassword" type="password" placeholder="demo12345"></div>
+    ${isLogin ? '<button class="link-btn" id="authForgot">忘记密码</button>' : ''}
     <div class="divider-text">${isLogin ? '还没有账号' : '已经有账号'}</div>
     <button class="btn" style="width:100%" id="authSwitch">${isLogin ? '去注册' : '去登录'}</button>
     <div class="modal-foot">
@@ -253,6 +254,7 @@ function openAuthModal(mode) {
     </div>`);
 
   $('#authSwitch').onclick = () => openAuthModal(isLogin ? 'register' : 'login');
+  if (isLogin) $('#authForgot').onclick = () => openResetModal($('#authAccount').value.trim());
   $('#authSubmit').onclick = async () => {
     const account = $('#authAccount').value.trim();
     const password = $('#authPassword').value;
@@ -273,6 +275,59 @@ function openAuthModal(mode) {
       await loadMe();
       closeModal();
       toast(`欢迎，${S.me.nickname}`);
+      await Promise.all([loadStats(), refreshSimilar()]);
+    } catch (error) {
+      toast(error.message);
+    }
+  };
+}
+
+/**
+ * R20 找回密码。
+ *
+ * 后端刻意不区分「账号不存在」和「还在一分钟冷却期内」，两种情况都回同一个成功响应，
+ * 否则这个接口就成了账号枚举器。前端不能自作聪明地补一句「没查到这个账号」把区别还原出来，
+ * 提示语必须对所有情况一致。
+ */
+function openResetModal(account = '') {
+  openModal(`
+    <h3>找回密码</h3>
+    <p>验证码会发到你注册时用的邮箱或手机号，10 分钟内有效</p>
+    <div class="field"><label>邮箱或手机号</label><input id="rsAccount" value="${esc(account)}" placeholder="demo@mathematics.local"></div>
+    <button class="btn" style="width:100%" id="rsSend">获取验证码</button>
+    <div class="field"><label>验证码（6 位）</label><input id="rsCode" maxlength="6" inputmode="numeric" autocomplete="one-time-code" placeholder="收到的 6 位数字"></div>
+    <div class="field"><label>新密码（至少 8 位）</label><input id="rsPassword" type="password" placeholder="设置一个新密码"></div>
+    <p class="hint" id="rsHint" role="status"></p>
+    <div class="modal-foot">
+      <button class="btn" data-close>取消</button>
+      <button class="btn btn-primary" id="rsSubmit">重置并登录</button>
+    </div>`);
+
+  $('#rsSend').onclick = async () => {
+    const value = $('#rsAccount').value.trim();
+    if (!value) return toast('先填邮箱或手机号');
+    try {
+      await api('/auth/password/reset-code', { method: 'POST', body: { account: value } });
+      // 这句话对「账号存在」「账号不存在」「冷却期内」三种情况都一样
+      $('#rsHint').textContent = '如果这个账号存在，验证码已经发出。同一账号 1 分钟内只发一次。';
+      $('#rsCode').focus();
+    } catch (error) {
+      toast(error.message);
+    }
+  };
+
+  $('#rsSubmit').onclick = async () => {
+    const body = {
+      account: $('#rsAccount').value.trim(),
+      code: $('#rsCode').value.trim(),
+      newPassword: $('#rsPassword').value
+    };
+    if (!body.account || !body.code || !body.newPassword) return toast('账号、验证码和新密码都要填');
+    try {
+      saveTokens(await api('/auth/password/reset', { method: 'POST', body }));
+      await loadMe();
+      closeModal();
+      toast('密码已重置，已帮你登录');
       await Promise.all([loadStats(), refreshSimilar()]);
     } catch (error) {
       toast(error.message);

@@ -237,6 +237,30 @@ class FrontendUiContractTest {
         assertThat(js).contains("MATERIAL_SOURCE_EXTRA", "licenseRef", "sourceUrl");
     }
 
+    @Test
+    void forgotPasswordPromptDoesNotRevealWhetherTheAccountExists() throws IOException {
+        String js = resource("static/app.js");
+        String css = resource("static/app.css");
+
+        // 入口只在登录态出现，注册页不需要
+        assertThat(js).contains("id=\"authForgot\"", "openResetModal($('#authAccount').value.trim())");
+
+        // 后端刻意不区分「账号不存在」和「冷却期内」，前端不能把这个区别还原出来：
+        // 提示语必须是同一句，不能出现任何「未注册」「不存在」式的措辞
+        assertThat(js).contains("如果这个账号存在，验证码已经发出");
+        assertThat(js).doesNotContain("该邮箱未注册", "账号不存在，请先注册");
+
+        // 一次性口令交给密码管理器自动填充，别让用户在两个窗口之间来回抄
+        assertThat(js).contains("autocomplete=\"one-time-code\"", "inputmode=\"numeric\"");
+        assertThat(js).contains("/auth/password/reset-code", "/auth/password/reset");
+
+        // 重置成功即登录：后端已经签发了令牌对，前端直接存下来
+        assertThat(js).contains("saveTokens(await api('/auth/password/reset'");
+
+        // 「忘记密码」外观像链接但仍是 button，键盘可达且焦点可见
+        assertThat(css).contains(".link-btn:focus-visible { outline: 2px solid var(--accent)");
+    }
+
     private static String resource(String path) throws IOException {
         return new ClassPathResource(path).getContentAsString(StandardCharsets.UTF_8);
     }

@@ -113,6 +113,72 @@ paths:
               schema:
                 $ref: '#/components/schemas/OkResponse'
 
+  /api/v1/auth/password/reset-code:
+    post:
+      tags: [identity]
+      operationId: requestPasswordResetCode
+      summary: R20 申请找回密码验证码
+      description: |
+        匿名接口。响应恒为 `{ "sent": true }`，与账号是否存在、是否还在冷却期无关。
+
+        任何差别都会把这个接口变成账号枚举器——一批邮箱跑一遍就知道哪些人在平台上，
+        对面向中小学生的产品这份名单本身就是敏感信息。代价是填错邮箱得不到提示。
+
+        规格要求同一账号 1 分钟内只发一次。冷却期内不签发新码，但响应不变：
+        回 429 会暴露账号存在，因为不存在的账号永远进不了冷却期。
+
+        验证码 10 分钟失效，只投递到注册时填的邮箱或手机号，绝不出现在响应体里。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetCodeRequest'
+      responses:
+        '200':
+          description: 已受理。不代表账号存在，也不代表真的发出了验证码
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResetCodeResponse'
+        '400':
+          $ref: '#/components/responses/Error'
+
+  /api/v1/auth/password/reset:
+    post:
+      tags: [identity]
+      operationId: resetPassword
+      summary: R20 用验证码重置密码
+      description: |
+        匿名接口。成功后直接签发新令牌：用户刚证明了自己控制那个邮箱或手机号，
+        再要求输一次密码没有意义。
+
+        成功会连带吊销该用户此前所有令牌（改密码的常见场景就是号被别人登进去了），
+        并清空登录失败计数与锁定状态（忘密码的人往往已经试错到被锁）。
+
+        验证码一次性，最多猜错 5 次即作废；申请新码会使旧码立即失效。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+      responses:
+        '200':
+          description: 密码已重置，返回新令牌对
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '400':
+          description: |
+            验证码错、过期、用过、猜太多次、账号不存在，全部返回同一个 VALIDATION_ERROR
+            与同一句提示。区分「码不对」和「码过期」会让攻击者判断自己是否在正确的时间窗口里。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorBody'
+
   /api/v1/users/me:
     get:
       tags: [identity]
@@ -813,6 +879,41 @@ components:
       properties:
         refreshToken:
           type: string
+
+    ResetCodeRequest:
+      type: object
+      required: [account]
+      properties:
+        account:
+          type: string
+          maxLength: 128
+          description: 注册时用的邮箱或手机号
+
+    ResetCodeResponse:
+      type: object
+      required: [sent]
+      properties:
+        sent:
+          type: boolean
+          description: |
+            恒为 true。故意不反映账号是否存在、是否还在冷却期，否则接口就成了账号枚举器。
+          example: true
+
+    ResetPasswordRequest:
+      type: object
+      required: [account, code, newPassword]
+      properties:
+        account:
+          type: string
+          maxLength: 128
+        code:
+          type: string
+          description: 收到的 6 位数字验证码
+          maxLength: 16
+        newPassword:
+          type: string
+          minLength: 8
+          maxLength: 72
 
     TokenResponse:
       type: object

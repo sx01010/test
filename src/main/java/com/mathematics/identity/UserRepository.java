@@ -100,6 +100,19 @@ public class UserRepository {
     }
 
     /**
+     * R20：换密码的同时解锁并清零失败计数。忘密码的人往往已经试错到被锁，
+     * 重置完还进不来就白做了。
+     */
+    public void resetPassword(long userId, String passwordHash) {
+        jdbc.update("""
+                UPDATE `user`
+                   SET password_hash = ?, fail_count = 0, locked_until = NULL, status = 'ACTIVE',
+                       updated_at = CURRENT_TIMESTAMP
+                 WHERE id = ?
+                """, passwordHash, userId);
+    }
+
+    /**
      * 只更新传进来的字段。用动态 SQL 而不是 COALESCE(?, col)：未绑定类型的 NULL 参数在 H2 上会被拒。
      */
     public void updateProfile(long userId, String nickname, Integer avatarPreset, Boolean practiceMode) {

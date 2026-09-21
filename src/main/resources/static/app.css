@@ -111,6 +111,13 @@ nav a.on { color: var(--accent-deep); background: var(--accent-soft); font-weigh
 .btn-primary { background: var(--accent); border-color: var(--accent-deep); color: var(--on-accent); font-weight: 600 }
 .btn-primary:hover { background: var(--accent-deep); color: var(--on-accent); transform: translate(-1px, -1px); box-shadow: var(--shadow-sm) }
 .btn:disabled { opacity: .45; cursor: not-allowed; transform: none; box-shadow: none }
+/* 「忘记密码」这类次要动作：外观像链接，但仍是 button，键盘可达、有可见焦点环 */
+.link-btn {
+  margin-top: 10px; padding: 0; border: 0; background: none; font: inherit; font-size: 13px;
+  color: var(--accent-deep); text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
+}
+.link-btn:hover { color: var(--ink) }
+.link-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px }
 .tag { padding: 2px 10px; border-radius: 999px; font-size: 12.5px; border: 1px solid var(--line); background: var(--paper-2); color: var(--ink-soft) }
 [data-theme="cool"] .tag { border-radius: 6px }
 .tag.src { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-deep) }
