@@ -2,10 +2,16 @@ spring:
   application:
     name: mathematics
 
-  # 默认 profile 用内存 H2，clone 下来 mvn spring-boot:run 就能直接跑通刷题闭环。
+  # 默认 profile 用落盘的 H2，clone 下来 mvn spring-boot:run 就能直接跑通刷题闭环。
+  # 用文件而不是内存，是为了让账号、登录令牌和做题记录活过重启：令牌存在 auth_token 表里，
+  # 库一没了连用户行都不在，前端存着的令牌自然就失效，每次重启都得重新登录。
+  # 库文件在 data/ 下，想从干净状态重来就删掉整个目录。
   # 正式环境用 -Dspring.profiles.active=mysql 切到 MySQL 8。
+  #
+  # 集成测试不吃这个地址：它们在 @SpringBootTest(properties = ...) 里各自钉了内存库，
+  # 否则测试数据会往开发库里累积，那些「恰好 N 条」的断言第二次就挂了。
   datasource:
-    url: jdbc:h2:mem:mathematics;MODE=MySQL;DATABASE_TO_LOWER=TRUE;NON_KEYWORDS=USER,YEAR,VALUE;DB_CLOSE_DELAY=-1
+    url: jdbc:h2:file:./data/mathematics;MODE=MySQL;DATABASE_TO_LOWER=TRUE;NON_KEYWORDS=USER,YEAR,VALUE;DB_CLOSE_DELAY=-1
     username: sa
     password: ""
 

@@ -28,12 +28,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * 端到端跑一遍刷题闭环：注册 → 筛题 → 提交判分 → 错题本 → 掌握 → 解析闸门 → 纠错。
- * 用默认 profile（内存 H2 + Flyway 种子数据），不依赖外部 MySQL。
+ * 不依赖外部 MySQL，用内存 H2 加 Flyway 种子数据。默认 profile 的库是落盘的，所以这里
+ * 自己钉一个内存库：下面有「恰好 N 条」这类精确条数断言，数据一累积第二次就挂了。
  *
  * <p>种子题目：1 单选答 B，2 填空答 9，3 多选答 A/C，4 判断答 true，5 多空答 16 / 32。
  * 题目 id 与版本 id 在种子里一一对应，所以下面直接用同一个数字。
  */
-@SpringBootTest
+@SpringBootTest(properties =
+        "spring.datasource.url=jdbc:h2:mem:mathematics;MODE=MySQL;DATABASE_TO_LOWER=TRUE;"
+                + "NON_KEYWORDS=USER,YEAR,VALUE;DB_CLOSE_DELAY=-1")
 @AutoConfigureMockMvc
 class PracticeFlowIntegrationTest {
 
