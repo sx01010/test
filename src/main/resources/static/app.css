@@ -308,6 +308,10 @@ h1.q { font-size: 19.5px; line-height: 1.6; margin: 14px 0 0 }
   padding-top: 15px; border-top: 1.5px solid var(--line);
 }
 .editing-badge { margin-right: auto; font-size: 13px; color: var(--ink-soft) }
+/* 资料行只有下载按钮可点，整行不该显示成可点：.row 默认带 cursor:pointer 与位移 hover */
+.material-row { cursor: default }
+.material-row:hover { transform: none }
+.admin-list a .btn { padding: 3px 10px; font-size: 12.5px }
 .admin-list a { align-items: flex-start; flex-wrap: wrap; gap: 7px }
 .admin-list .admin-row-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
 .admin-list small { color: var(--ink-soft); letter-spacing: 0; font-variant-numeric: tabular-nums }

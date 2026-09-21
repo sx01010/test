@@ -190,6 +190,35 @@ class FrontendUiContractTest {
         assertThat(html).doesNotContain("id=\"fbStem\"");
     }
 
+    @Test
+    void materialDownloadIsAnonymousAndUploadIsTwoStep() throws IOException {
+        String html = resource("static/index.html");
+        String js = resource("static/app.js");
+
+        // 资料是获客入口，导航栏不加 hidden：匿名也该看得见
+        assertThat(html).contains("<a data-view=\"materials\">资料</a>");
+        assertThat(js).contains("const VIEWS = ['problems', 'me', 'materials', 'admin']");
+
+        // 下载要先换 5 分钟有效的签名地址，未登录时引导登录而不是报错
+        assertThat(js).contains(
+                "/download-url`, { method: 'POST' }",
+                "if (!S.me)",
+                "openAuthModal('login')");
+
+        // 上传是两步：先换凭证再传字节，摘要在浏览器算一遍
+        assertThat(js).contains(
+                "/admin/materials/upload-ticket",
+                "crypto.subtle.digest('SHA-256', buffer)",
+                "ticket.uploadUrl");
+        assertThat(html).contains(
+                "<label for=\"amFile\">PDF 文件</label>",
+                "accept=\"application/pdf\"",
+                "<label for=\"amOrigin\">来源类型</label>",
+                "id=\"amError\" role=\"alert\" tabindex=\"-1\" hidden");
+        // 授权字段随来源类型出现，和后端发布闸门一一对应
+        assertThat(js).contains("MATERIAL_SOURCE_EXTRA", "licenseRef", "sourceUrl");
+    }
+
     private static String resource(String path) throws IOException {
         return new ClassPathResource(path).getContentAsString(StandardCharsets.UTF_8);
     }

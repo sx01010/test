@@ -39,7 +39,8 @@ const S = {
   timerMode: 'PER_PROBLEM', seconds: 0, tick: null,
   today: { done: 0, correct: 0 },
   wrongFilter: { mastered: '0', since: 'all', tagId: null },
-  admin: { editingId: null, tab: 'author', tickets: [] }
+  admin: { editingId: null, tab: 'author', tickets: [] },
+  materials: { cursor: null, objectKey: null }
 };
 
 /* ========================= 基础工具 ========================= */
@@ -209,11 +210,12 @@ if (savedTheme) {
   $$('#themeSwitch button').forEach(button => button.classList.toggle('on', button.dataset.themeBtn === savedTheme));
 }
 
-const VIEWS = ['problems', 'me', 'admin'];
+const VIEWS = ['problems', 'me', 'materials', 'admin'];
 function go(view) {
   VIEWS.forEach(name => { $(`#view-${name}`).hidden = name !== view; });
   $$('#nav a').forEach(link => link.classList.toggle('on', link.dataset.view === view));
   if (view === 'me') loadMyPractice();
+  if (view === 'materials') reloadMaterials();
   if (view === 'admin') refreshAdminTab();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -1011,6 +1013,7 @@ function setupAdmin() {
   $('#apOrigin').onchange = () => renderSourceExtra($('#apOrigin').value, null);
   $('#apStatusFilter').onchange = refreshAdminList;
   setupFeedbackQueue();
+  setupAdminMaterial();
   $('#apReset').onclick = resetAdminForm;
   $('#apSaveDraft').onclick = () => saveAdminProblem(false);
   $('#apPublish').onclick = () => saveAdminProblem(true);
@@ -1255,6 +1258,8 @@ function markAdminEditing(id, versionNo, status) {
 function refreshAdminTab() {
   if (S.admin.tab === 'feedback') {
     loadFeedbackQueue().catch(error => toast(error.message));
+  } else if (S.admin.tab === 'material') {
+    loadAdminMaterialList().catch(error => toast(error.message));
   } else {
     refreshAdminList();
   }
@@ -1339,11 +1344,14 @@ const FEEDBACK_REASON = {
   OTHER: '其他'
 };
 
+const ADMIN_TAB_HEADING = { author: '题目录入', feedback: '纠错处理', material: '资料管理' };
+
 function showAdminTab(tab) {
   S.admin.tab = tab;
   $('#adminAuthor').hidden = tab !== 'author';
   $('#adminFeedback').hidden = tab !== 'feedback';
-  $('#adminHeading').textContent = tab === 'feedback' ? '纠错处理' : '题目录入';
+  $('#adminMaterial').hidden = tab !== 'material';
+  $('#adminHeading').textContent = ADMIN_TAB_HEADING[tab] || '题目录入';
   $$('#adminTabs [data-admin-tab]').forEach(button => {
     const on = button.dataset.adminTab === tab;
     button.classList.toggle('on', on);
@@ -1443,6 +1451,216 @@ async function resolveFeedback(id) {
   }
 }
 
+/* ========================= 资料下载 ========================= */
+
+const MATERIAL_TYPE_NAME = { PAPER: '真题', HANDOUT: '讲义' };
+const MATERIAL_ORIGIN_NAME = { OWNED: '平台自有', LICENSED: '已授权', PUBLIC: '公开来源' };
+const MATERIAL_SOURCE_EXTRA = {
+  LICENSED: ['licenseRef', '授权凭证', '发布前必填。写清授权方与凭证编号，出问题时这是唯一的依据。'],
+  PUBLIC: ['sourceUrl', '公开来源链接', '发布前必填。指向原始公开页面，而不是我们自己的副本。']
+};
+
+function materialQuery() {
+  const params = new URLSearchParams();
+  const type = $('#mtTypeFilter').value;
+  const grade = $('#mtGradeFilter').value;
+  const year = $('#mtYearFilter').value;
+  if (type) params.set('type', type);
+  if (grade) params.set('grade', grade);
+  if (year) params.set('year', year);
+  if (S.materials.cursor) params.set('cursor', S.materials.cursor);
+  return params.toString() ? `?${params}` : '';
+}
+
+function reloadMaterials() {
+  S.materials.cursor = null;
+  $('#materialList').innerHTML = '';
+  loadMaterials().catch(error => toast(error.message));
+}
+
+async function loadMaterials() {
+  const page = await api(`/materials${materialQuery()}`);
+  $('#materialList').insertAdjacentHTML('beforeend', page.items.length
+    ? page.items.map(materialRow).join('')
+    : '<p class="hint">这个筛选下还没有资料。</p>');
+  S.materials.cursor = page.nextCursor;
+  $('#mtMore').hidden = !page.nextCursor;
+  $('#materialCount').textContent = page.nextCursor ? '还有更多' : `共 ${$$('#materialList [data-material-id]').length} 份`;
+
+  $$('#materialList [data-material-id]').forEach(button => {
+    button.onclick = () => downloadMaterial(Number(button.dataset.materialId));
+  });
+}
+
+function materialRow(item) {
+  const meta = [MATERIAL_TYPE_NAME[item.type] || item.type, item.grade, item.year, MATERIAL_ORIGIN_NAME[item.originType]]
+    .filter(Boolean).join(' · ');
+  return `<article class="card row material-row">
+    <div class="row-main">
+      <div class="row-title">${esc(item.title)}</div>
+      <div class="row-sub">${esc(meta)} · ${formatSize(item.sizeBytes)}</div>
+    </div>
+    <button type="button" class="btn" data-material-id="${item.id}"
+            aria-label="下载 ${esc(item.title)}">下载 PDF</button>
+  </article>`;
+}
+
+function formatSize(bytes) {
+  if (!bytes) return '';
+  const mb = bytes / 1024 / 1024;
+  return mb >= 1 ? `${mb.toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
+/** 下载要先换一个 5 分钟有效的签名地址，再跳转。未登录时引导去登录，而不是报错。 */
+async function downloadMaterial(id) {
+  if (!S.me) {
+    toast('下载前请先登录');
+    return openAuthModal('login');
+  }
+  try {
+    const signed = await api(`/materials/${id}/download-url`, { method: 'POST' });
+    window.location.assign(signed.url);
+  } catch (error) {
+    toast(error.message);
+  }
+}
+
+/* ========================= 管理端资料 ========================= */
+
+function showAmError(message) {
+  const box = $('#amError');
+  box.hidden = false;
+  box.textContent = message;
+  box.focus();
+}
+
+function setupAdminMaterial() {
+  $('#amOrigin').onchange = () => renderMaterialSourceExtra($('#amOrigin').value);
+  $('#amFile').onchange = () => {
+    S.materials.objectKey = null;
+    const file = $('#amFile').files[0];
+    $('#amState').textContent = file ? `待上传：${file.name}（${formatSize(file.size)}）` : '还没有选文件';
+    if (file && !$('#amTitle').value.trim()) $('#amTitle').value = file.name.replace(/\.pdf$/i, '');
+  };
+  $('#amSaveDraft').onclick = () => saveMaterial(false);
+  $('#amPublish').onclick = () => saveMaterial(true);
+  renderMaterialSourceExtra('OWNED');
+}
+
+/** 公开资料页的筛选与翻页。和管理端分开接线：这一页匿名也能用。 */
+function setupMaterials() {
+  $('#mtTypeFilter').onchange = reloadMaterials;
+  $('#mtGradeFilter').onchange = reloadMaterials;
+  $('#mtYearFilter').onchange = reloadMaterials;
+  $('#mtMore').onclick = () => loadMaterials().catch(error => toast(error.message));
+}
+
+function renderMaterialSourceExtra(originType) {
+  const spec = MATERIAL_SOURCE_EXTRA[originType];
+  const field = $('#amSourceExtraField');
+  if (!spec) {
+    field.hidden = true;
+    field.innerHTML = '';
+    return;
+  }
+  const [key, label, hint] = spec;
+  field.hidden = false;
+  field.innerHTML = `<label for="amSourceExtra">${label}</label>
+    <textarea id="amSourceExtra" rows="2" data-source-key="${key}"></textarea>
+    <p class="field-hint">${hint}</p>`;
+}
+
+/** 摘要在浏览器里算，服务端收到字节后会重算一遍比对，所以这里算错只会导致上传被拒。 */
+async function sha256Hex(buffer) {
+  const digest = await crypto.subtle.digest('SHA-256', buffer);
+  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+/** 申请凭证 → 上传字节。两步都成功才记下 objectKey，失败时不留半个状态。 */
+async function uploadMaterialFile(file) {
+  const buffer = await file.arrayBuffer();
+  const ticket = await api('/admin/materials/upload-ticket', {
+    method: 'POST',
+    body: { fileName: file.name, mimeType: 'application/pdf', sizeBytes: file.size, sha256: await sha256Hex(buffer) }
+  });
+
+  const response = await fetch(ticket.uploadUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/octet-stream', Authorization: `Bearer ${tokens().accessToken}` },
+    body: buffer
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    throw new Error(payload?.message || '上传失败');
+  }
+  return ticket.objectKey;
+}
+
+async function saveMaterial(publish) {
+  const file = $('#amFile').files[0];
+  if (!file && !S.materials.objectKey) return showAmError('先选一个 PDF 文件');
+  if (!$('#amTitle').value.trim()) return showAmError('标题不能为空');
+
+  const button = publish ? $('#amPublish') : $('#amSaveDraft');
+  button.disabled = true;
+  try {
+    if (!S.materials.objectKey) {
+      $('#amState').textContent = '正在上传…';
+      S.materials.objectKey = await uploadMaterialFile(file);
+    }
+    const extra = $('#amSourceExtra');
+    const saved = await api('/admin/materials', {
+      method: 'POST',
+      body: {
+        title: $('#amTitle').value.trim(),
+        type: $('#amType').value,
+        grade: $('#amGrade').value.trim() || null,
+        year: $('#amYear').value ? Number($('#amYear').value) : null,
+        originType: $('#amOrigin').value,
+        [extra?.dataset.sourceKey || 'licenseRef']: extra ? extra.value.trim() || null : null,
+        objectKey: S.materials.objectKey,
+        publish
+      }
+    });
+    $('#amError').hidden = true;
+    $('#amState').textContent = `已保存 #${saved.id} · ${STATUS_NAME[saved.status] || saved.status}`;
+    toast(saved.status === 'PUBLISHED' ? '资料已发布' : '草稿已保存');
+    S.materials.objectKey = null;
+    $('#amFile').value = '';
+    await loadAdminMaterialList();
+  } catch (error) {
+    showAmError(error.message);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function loadAdminMaterialList() {
+  const page = await api('/materials');
+  $('#amList').innerHTML = page.items.length
+    ? page.items.map(item => `<a>
+        <span class="state ok">${MATERIAL_TYPE_NAME[item.type] || item.type}</span>
+        <span class="admin-row-title">${esc(item.title)}</span>
+        <small>${esc([item.grade, item.year].filter(Boolean).join(' · '))} · ${formatSize(item.sizeBytes)}</small>
+        <button type="button" class="btn" data-takedown="${item.id}">下架</button>
+      </a>`).join('')
+    : '<p class="hint">还没有已发布的资料。草稿不在这个列表里。</p>';
+
+  $$('#amList [data-takedown]').forEach(button => {
+    button.onclick = () => takedownMaterial(Number(button.dataset.takedown));
+  });
+}
+
+async function takedownMaterial(id) {
+  try {
+    await api(`/admin/materials/${id}/takedown`, { method: 'POST' });
+    showAmError('已下架。之前发出去的下载链接立刻失效，文件已打延迟清理标记。');
+    await loadAdminMaterialList();
+  } catch (error) {
+    showAmError(error.message);
+  }
+}
+
 /* ========================= 启动 ========================= */
 
 (async function boot() {
@@ -1451,6 +1669,7 @@ async function resolveFeedback(id) {
     await loadMe();
     await loadTags();
     setupAdmin();
+    setupMaterials();
     await reloadList();
     await loadStats();
   } catch (error) {

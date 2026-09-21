@@ -25,6 +25,7 @@
     <nav id="nav">
       <a data-view="problems" class="on">题库</a>
       <a data-view="me">我的练习</a>
+      <a data-view="materials">资料</a>
       <a data-view="admin" id="navAdmin" hidden>管理</a>
     </nav>
     <label class="search">
@@ -148,6 +149,36 @@
     <div class="list" id="submissionList"></div>
   </div>
 
+  <!-- ============ 资料下载 ============ -->
+  <div id="view-materials" hidden>
+    <div class="sec-head"><h2>真题与讲义</h2><span id="materialCount"></span></div>
+    <div class="filters">
+      <label class="filter-field">
+        <span>类型</span>
+        <select id="mtTypeFilter" class="filter-select">
+          <option value="">全部类型</option>
+          <option value="PAPER">真题</option>
+          <option value="HANDOUT">讲义</option>
+        </select>
+      </label>
+      <label class="filter-field">
+        <span>年级</span>
+        <select id="mtGradeFilter" class="filter-select">
+          <option value="">全部年级</option>
+          <option value="四年级">四年级</option>
+          <option value="五年级">五年级</option>
+          <option value="六年级">六年级</option>
+        </select>
+      </label>
+      <label class="filter-field">
+        <span>年份</span>
+        <input id="mtYearFilter" class="filter-select" type="number" min="1900" max="2100" placeholder="全部年份">
+      </label>
+    </div>
+    <div class="list" id="materialList"></div>
+    <div class="more"><button class="btn" id="mtMore" hidden>加载更多</button></div>
+  </div>
+
   <!-- ============ 管理端录入 ============ -->
   <div id="view-admin" hidden>
     <div class="sec-head">
@@ -155,6 +186,7 @@
       <div class="mode" id="adminTabs" role="tablist" aria-label="管理功能">
         <button type="button" class="chip on" role="tab" data-admin-tab="author" aria-selected="true">录题</button>
         <button type="button" class="chip" role="tab" data-admin-tab="feedback" aria-selected="false">纠错</button>
+        <button type="button" class="chip" role="tab" data-admin-tab="material" aria-selected="false">资料</button>
       </div>
     </div>
 
@@ -300,6 +332,63 @@
               </select>
             </label>
             <div class="rec admin-list" id="fbList"></div>
+          </section>
+        </aside>
+      </div>
+    </div>
+
+    <div id="adminMaterial" hidden>
+      <div class="admin-grid">
+        <main>
+          <section class="card admin-form">
+            <div class="form-error" id="amError" role="alert" tabindex="-1" hidden></div>
+            <div class="form-grid">
+              <div class="field span-2">
+                <label for="amFile">PDF 文件</label>
+                <input id="amFile" type="file" accept="application/pdf">
+                <p class="field-hint">只接受 PDF，不超过 30 MB。上传前会先算一遍摘要，服务端逐项比对。</p>
+              </div>
+              <div class="field span-2">
+                <label for="amTitle">标题</label>
+                <input id="amTitle" maxlength="200" autocomplete="off">
+              </div>
+              <div class="field">
+                <label for="amType">资料类型</label>
+                <select id="amType">
+                  <option value="PAPER">真题</option>
+                  <option value="HANDOUT">讲义</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="amGrade">适用年级</label>
+                <input id="amGrade" maxlength="16" value="六年级" autocomplete="off">
+              </div>
+              <div class="field">
+                <label for="amYear">年份</label>
+                <input id="amYear" type="number" min="1900" max="2100">
+              </div>
+              <div class="field">
+                <label for="amOrigin">来源类型</label>
+                <select id="amOrigin">
+                  <option value="OWNED">平台自有</option>
+                  <option value="LICENSED">已授权</option>
+                  <option value="PUBLIC">公开来源</option>
+                </select>
+              </div>
+              <div class="field span-2" id="amSourceExtraField" hidden></div>
+            </div>
+            <div class="form-foot">
+              <span class="editing-badge" id="amState">还没有选文件</span>
+              <button type="button" class="btn" id="amSaveDraft">保存草稿</button>
+              <button type="button" class="btn btn-primary" id="amPublish">发布</button>
+            </div>
+          </section>
+        </main>
+        <aside>
+          <section class="card panel">
+            <div class="eyebrow">Published</div>
+            <h3>已发布资料</h3>
+            <div class="rec admin-list" id="amList"></div>
           </section>
         </aside>
       </div>

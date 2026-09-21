@@ -38,6 +38,16 @@ mathematics:
   dev:
     # 开发环境自动建一个演示账号 demo@mathematics.local / demo12345
     seed-demo-user: true
+  material:
+    # R21–R23：V1 没有对象存储，资料文件写本地目录（和 H2 库文件一样在 data/ 下，不进版本库）
+    storage-dir: ./data/materials
+    # 规格要求签名地址 5 分钟失效
+    download-ttl: PT5M
+    upload-ttl: PT15M
+    # 30 MB，和 material_file 的 CHECK 约束一致
+    max-size-bytes: 31457280
+    # 留空则启动时随机生成一把并打 WARN。不给硬编码默认值：写在仓库里的密钥等于没有签名。
+    signing-secret: ${MATERIAL_SIGNING_SECRET:}
 
 management:
   endpoints:
