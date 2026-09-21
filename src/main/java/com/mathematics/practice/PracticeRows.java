@@ -29,6 +29,10 @@ public final class PracticeRows {
         }
     }
 
+    /** 重判只需要这四个字段：拿原答案重新判一次，再跟原结果比对是否变化。 */
+    public record Regradable(long id, long userId, String answerJson, String result) {
+    }
+
     public record WrongItem(
             long id,
             long problemId,

@@ -39,7 +39,7 @@ const S = {
   timerMode: 'PER_PROBLEM', seconds: 0, tick: null,
   today: { done: 0, correct: 0 },
   wrongFilter: { mastered: '0', since: 'all', tagId: null },
-  admin: { editingId: null }
+  admin: { editingId: null, tab: 'author', tickets: [] }
 };
 
 /* ========================= 基础工具 ========================= */
@@ -214,7 +214,7 @@ function go(view) {
   VIEWS.forEach(name => { $(`#view-${name}`).hidden = name !== view; });
   $$('#nav a').forEach(link => link.classList.toggle('on', link.dataset.view === view));
   if (view === 'me') loadMyPractice();
-  if (view === 'admin') refreshAdminList();
+  if (view === 'admin') refreshAdminTab();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 $$('#nav a').forEach(link => { link.onclick = () => go(link.dataset.view); });
@@ -1010,6 +1010,7 @@ function setupAdmin() {
   };
   $('#apOrigin').onchange = () => renderSourceExtra($('#apOrigin').value, null);
   $('#apStatusFilter').onchange = refreshAdminList;
+  setupFeedbackQueue();
   $('#apReset').onclick = resetAdminForm;
   $('#apSaveDraft').onclick = () => saveAdminProblem(false);
   $('#apPublish').onclick = () => saveAdminProblem(true);
@@ -1251,6 +1252,14 @@ function markAdminEditing(id, versionNo, status) {
   $('#apEditing').textContent = `正在编辑 #${id} · v${versionNo} · ${STATUS_NAME[status] || status}`;
 }
 
+function refreshAdminTab() {
+  if (S.admin.tab === 'feedback') {
+    loadFeedbackQueue().catch(error => toast(error.message));
+  } else {
+    refreshAdminList();
+  }
+}
+
 function refreshAdminList() {
   loadAdminList().catch(error => toast(error.message));
 }
@@ -1319,6 +1328,119 @@ function resetAdminForm() {
   renderAdminAnswerArea('SINGLE', null);
   $('#apEditing').textContent = '新建题目';
   hideAdminError();
+}
+
+/* ========================= 纠错队列 ========================= */
+
+const FEEDBACK_REASON = {
+  ANSWER_ERROR: '答案有误',
+  TYPO: '错别字',
+  UNCLEAR: '题意不清',
+  OTHER: '其他'
+};
+
+function showAdminTab(tab) {
+  S.admin.tab = tab;
+  $('#adminAuthor').hidden = tab !== 'author';
+  $('#adminFeedback').hidden = tab !== 'feedback';
+  $('#adminHeading').textContent = tab === 'feedback' ? '纠错处理' : '题目录入';
+  $$('#adminTabs [data-admin-tab]').forEach(button => {
+    const on = button.dataset.adminTab === tab;
+    button.classList.toggle('on', on);
+    button.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
+  refreshAdminTab();
+}
+
+function showFeedbackResult(message) {
+  const box = $('#feedbackResult');
+  box.hidden = false;
+  box.textContent = message;
+  box.focus();
+}
+
+function setupFeedbackQueue() {
+  $$('#adminTabs [data-admin-tab]').forEach(button => {
+    button.onclick = () => showAdminTab(button.dataset.adminTab);
+  });
+  $('#fbStatusFilter').onchange = () => loadFeedbackQueue().catch(error => toast(error.message));
+}
+
+async function loadFeedbackQueue() {
+  const status = $('#fbStatusFilter').value;
+  const rows = await api(`/admin/feedback?status=${status}`);
+  S.admin.tickets = rows;
+  $('#fbList').innerHTML = rows.length
+    ? rows.map(row => `<a data-feedback-id="${row.id}">
+        <span class="state ${row.status === 'OPEN' ? 'new' : 'ok'}">${FEEDBACK_REASON[row.reason] || row.reason}</span>
+        <span class="admin-row-title">${esc(row.problemTitle)}</span>
+        <small>${esc((row.createdAt || '').replace('T', ' ').slice(0, 16))}</small>
+      </a>`).join('')
+    : '<p class="hint">这个状态下没有纠错。</p>';
+
+  $$('#fbList [data-feedback-id]').forEach(link => {
+    link.onclick = () => renderFeedbackDetail(Number(link.dataset.feedbackId));
+  });
+}
+
+function renderFeedbackDetail(id) {
+  const ticket = S.admin.tickets.find(row => row.id === id);
+  if (!ticket) return;
+  const open = ticket.status === 'OPEN';
+  $('#feedbackDetail').innerHTML = `
+    <h3 style="margin:0 0 6px">${esc(ticket.problemTitle)}</h3>
+    <p class="hint">${esc(FEEDBACK_REASON[ticket.reason] || ticket.reason)} · ${esc((ticket.createdAt || '').replace('T', ' ').slice(0, 16))}</p>
+    <p>${esc(ticket.detail || '学生没有补充说明')}</p>
+    ${ticket.problemAlreadyRevised ? '<p class="hint">这道题在提单之后已经发布过新版本，可以直接结案并重判。</p>' : ''}
+    ${open ? `
+      <fieldset class="opt-edit">
+        <legend>处理结论</legend>
+        <label class="inline-choice"><input type="radio" name="fbDecision" value="FIXED" checked>已修正</label>
+        <label class="inline-choice"><input type="radio" name="fbDecision" value="REJECTED">驳回</label>
+      </fieldset>
+      <div class="field">
+        <label for="fbRemark">处理说明</label>
+        <textarea id="fbRemark" rows="2" maxlength="256"></textarea>
+      </div>
+      <label class="inline-choice"><input type="checkbox" id="fbRegrade" checked>按当前版本重判历史提交</label>
+      <div class="form-foot">
+        <button type="button" class="btn" id="fbEdit">去修正</button>
+        <button type="button" class="btn btn-primary" id="fbResolve">结案</button>
+      </div>` : '<p class="hint">这条已经结案，不能再处理一次。</p>'}`;
+
+  if (!open) return;
+  $('#fbEdit').onclick = () => {
+    showAdminTab('author');
+    openAdminProblem(ticket.problemId);
+  };
+  $('#fbResolve').onclick = () => resolveFeedback(ticket.id);
+}
+
+async function resolveFeedback(id) {
+  const decision = $('#feedbackDetail [name="fbDecision"]:checked').value;
+  const button = $('#fbResolve');
+  button.disabled = true;
+  try {
+    const result = await api(`/admin/feedback/${id}/resolve`, {
+      method: 'POST',
+      body: {
+        decision,
+        regrade: decision === 'FIXED' && $('#fbRegrade').checked,
+        remark: $('#fbRemark').value.trim() || null
+      }
+    });
+    const regraded = result.regradedCount || 0;
+    const message = decision === 'REJECTED'
+      ? '已驳回，题目和历史提交都没有改动。'
+      : (regraded ? `已结案，重判了 ${regraded} 条提交。` : '已结案，没有需要改判的提交。');
+    showFeedbackResult(message);
+    await loadFeedbackQueue();
+    $('#feedbackDetail').innerHTML = '<p class="hint">从右侧选下一条纠错。</p>';
+  } catch (error) {
+    showFeedbackResult(error.message);
+  } finally {
+    button.disabled = false;
+  }
 }
 
 /* ========================= 启动 ========================= */

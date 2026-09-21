@@ -60,6 +60,23 @@ public class WrongItemRepository {
                 """, submissionId, masteryThreshold, userId, problemId);
     }
 
+    /**
+     * 重判把答错翻成答对时，撤掉当初那次错误计数。
+     *
+     * <p>和 {@link #recordCorrect} 不是一回事：那个是学生重新做对了，连对计数该加；这里是判错本身
+     * 就是我们自己的 bug，那条记录本来不该存在。所以减错误计数，减到 0 就把整行删掉——
+     * 一道从来没真正做错过的题，不该赖在错题本里。
+     */
+    public void undoWrong(long userId, long problemId, long submissionId, long versionId) {
+        jdbc.update("""
+                UPDATE wrong_item
+                   SET wrong_count = wrong_count - 1, last_submission_id = ?, last_version_id = ?
+                 WHERE user_id = ? AND problem_id = ? AND wrong_count > 0
+                """, submissionId, versionId, userId, problemId);
+        jdbc.update("DELETE FROM wrong_item WHERE user_id = ? AND problem_id = ? AND wrong_count <= 0",
+                userId, problemId);
+    }
+
     public int setMastered(long userId, long problemId, boolean mastered) {
         return jdbc.update("""
                 UPDATE wrong_item

@@ -88,4 +88,32 @@ public final class AdminDtos {
             List<Long> tagIds,
             SourceInput source) {
     }
+
+    /**
+     * A21 结案请求。{@code newVersion} 走的是和录题完全相同的请求体，
+     * 所以来源闸门、标准答案自检、changeNote 强制这些规则自动生效——
+     * 纠错升版没有理由比正常升版宽松。
+     */
+    public record ResolveFeedbackRequest(
+            @NotBlank(message = "处理结论不能为空") String decision,
+            @Valid UpsertProblemRequest newVersion,
+            boolean regrade,
+            @Size(max = 256, message = "处理说明最长 256 字") String remark) {
+    }
+
+    /** regradedCount 是 0 也要返回，管理员得能区分「没受影响」和「重判没生效」。 */
+    public record ResolveFeedbackResponse(long id, String status, Integer versionNo, int regradedCount) {
+    }
+
+    /** 纠错队列条目。带题目标题，免得管理员为了知道是哪道题再点一次。 */
+    public record AdminFeedbackSummary(
+            long id,
+            long problemId,
+            String problemTitle,
+            String reason,
+            String detail,
+            String status,
+            boolean problemAlreadyRevised,
+            String createdAt) {
+    }
 }

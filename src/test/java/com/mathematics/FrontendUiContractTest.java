@@ -170,6 +170,26 @@ class FrontendUiContractTest {
         assertThat(js).contains("SOURCE_EXTRA", "rewriteNote", "licenseRef", "sourceUrl");
     }
 
+    @Test
+    void feedbackQueueAnnouncesRegradeResultAndDoesNotDuplicateTheAuthoringForm() throws IOException {
+        String html = resource("static/index.html");
+        String js = resource("static/app.js");
+
+        assertThat(html).contains(
+                "data-admin-tab=\"feedback\"",
+                "id=\"feedbackResult\" role=\"alert\" tabindex=\"-1\" hidden",
+                "id=\"fbStatusFilter\"");
+        // 结案不在这个界面重做录题表单：去修正跳回录题，重判结果要能被读屏播报
+        assertThat(js).contains(
+                "function showFeedbackResult",
+                "box.focus()",
+                "showAdminTab('author')",
+                "<label for=\"fbRemark\">处理说明</label>",
+                "没有需要改判的提交",
+                "regradedCount");
+        assertThat(html).doesNotContain("id=\"fbStem\"");
+    }
+
     private static String resource(String path) throws IOException {
         return new ClassPathResource(path).getContentAsString(StandardCharsets.UTF_8);
     }
