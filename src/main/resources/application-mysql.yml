@@ -28,7 +28,7 @@ spring:
 mathematics:
   auth:
     # 验证码不能进正式环境的日志：运维、日志采集、报错平台都能看到，等于给所有账号留了后门。
-    # 接上真实邮件或短信通道之前，这个 profile 下的找回密码功能实际不可用。
+    # 找回密码靠邮件送达：MAIL_ENABLED=true 加 SPRING_MAIL_HOST / PORT / USERNAME / PASSWORD。
     log-reset-codes: false
   rate-limit:
     # 多实例共享计数。Redis 挂掉时限流放行而不是拒绝，见 RedisRateLimiter

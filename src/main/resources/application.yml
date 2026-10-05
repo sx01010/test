@@ -26,6 +26,17 @@ spring:
   jackson:
     default-property-inclusion: non_null
 
+  # host / port / username / password 不写在这里，用环境变量 SPRING_MAIL_HOST 等传入：
+  # 哪怕写成空字符串，Spring Boot 也会认为配了邮件服务器，建出一个连不上的 JavaMailSender，健康检查跟着报 DOWN。
+  # 465 端口走 SSL（MAIL_SSL=true），mailpit 的 1025 是明文（MAIL_SSL=false MAIL_SMTP_AUTH=false）。
+  mail:
+    properties:
+      mail.smtp.auth: ${MAIL_SMTP_AUTH:true}
+      mail.smtp.ssl.enable: ${MAIL_SSL:true}
+      mail.smtp.connectiontimeout: 5000
+      mail.smtp.timeout: 5000
+      mail.smtp.writetimeout: 5000
+
 server:
   port: 8080
 
@@ -43,7 +54,7 @@ mathematics:
     reset-code-cooldown: PT1M
     # 规格没提这条，但它比有效期更要紧：六位数字能无限猜的话，10 分钟够轮询完
     reset-max-attempts: 5
-    # V1 没有邮件与短信通道，验证码只能打到日志供开发自测。mysql profile 里关掉。
+    # 开发环境把验证码额外打到日志，免得自测还要起邮件服务。mysql profile 里关掉。
     # 绝不放进响应体：那样任何人都能拿别人的邮箱要码然后直接改密码。
     log-reset-codes: true
   dev:
@@ -60,6 +71,17 @@ mathematics:
     # 留空则启动时随机生成一把并打 WARN。不给硬编码默认值：写在仓库里的密钥等于没有签名。
     signing-secret: ${MATERIAL_SIGNING_SECRET:}
 
+  notification:
+    # 开发环境默认不发真邮件，验证码看日志。本地想看真实邮件就起 docker-compose 里的 mailpit，
+    # 再设 MAIL_ENABLED=true SPRING_MAIL_HOST=127.0.0.1 SPRING_MAIL_PORT=1025 MAIL_SSL=false MAIL_SMTP_AUTH=false，
+    # 网页 http://localhost:8025 收信
+    mail:
+      enabled: ${MAIL_ENABLED:false}
+      from: ${MAIL_FROM:mathematics <no-reply@mathematics.local>}
+    sms:
+      # 接入短信需要提供 com.mathematics.notify.SmsGateway 的实现，见该接口的注释
+      enabled: ${SMS_ENABLED:false}
+      template-code: ${SMS_TEMPLATE_CODE:}
   rate-limit:
     enabled: true
     # 单机开发用内存计数；mysql profile 切到 redis

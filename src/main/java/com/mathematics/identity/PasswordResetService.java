@@ -4,8 +4,6 @@ import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,6 +11,8 @@ import org.springframework.transaction.annotation.Transactional;
 import com.mathematics.config.AppProperties;
 import com.mathematics.identity.IdentityDtos.ResetPasswordRequest;
 import com.mathematics.identity.IdentityDtos.TokenResponse;
+import com.mathematics.notify.Channel;
+import com.mathematics.notify.CodeDelivery;
 import com.mathematics.support.ApiException;
 
 /**
@@ -22,17 +22,14 @@ import com.mathematics.support.ApiException;
  * <ul>
  *   <li><b>不泄露账号是否存在。</b>申请验证码永远返回同一个响应，校验失败永远返回同一句话。
  *       一个「该邮箱未注册」的提示就把接口变成了账号枚举器。</li>
- *   <li><b>验证码不出服务端。</b>只进日志，绝不进响应体——放进响应体等于任何人都能拿别人的
+ *   <li><b>验证码不出服务端。</b>只经由邮件或短信送达，绝不进响应体——放进响应体等于任何人都能拿别人的
  *       邮箱要一个码然后直接改密码。</li>
  * </ul>
  */
 @Service
 public class PasswordResetService {
 
-    private static final Logger log = LoggerFactory.getLogger(PasswordResetService.class);
     private static final SecureRandom RANDOM = new SecureRandom();
-    private static final String EMAIL = "EMAIL";
-    private static final String PHONE = "PHONE";
 
     /** 码错、码过期、码用过、猜太多次、账号不存在，全都回这一句。 */
     private static final String OPAQUE_FAILURE = "验证码无效或已过期，请重新获取";
@@ -42,16 +39,18 @@ public class PasswordResetService {
     private final PasswordResetRepository resetCodes;
     private final AuthService authService;
     private final PasswordEncoder passwordEncoder;
+    private final CodeDelivery delivery;
     private final AppProperties.Auth config;
 
     public PasswordResetService(UserRepository users, AuthTokenRepository tokens,
                                PasswordResetRepository resetCodes, AuthService authService,
-                               PasswordEncoder passwordEncoder, AppProperties properties) {
+                               PasswordEncoder passwordEncoder, CodeDelivery delivery, AppProperties properties) {
         this.users = users;
         this.tokens = tokens;
         this.resetCodes = resetCodes;
         this.authService = authService;
         this.passwordEncoder = passwordEncoder;
+        this.delivery = delivery;
         this.config = properties.auth();
     }
 
@@ -73,11 +72,13 @@ public class PasswordResetService {
             return;
         }
 
+        Channel channel = channelOf(user, account.trim());
         resetCodes.invalidateOutstanding(user.id());
         String code = "%06d".formatted(RANDOM.nextInt(1_000_000));
-        resetCodes.insert(user.id(), channelOf(user, account.trim()), passwordEncoder.encode(code),
+        resetCodes.insert(user.id(), channel.name(), passwordEncoder.encode(code),
                 LocalDateTime.now().plus(config.resetCodeTtl()));
-        deliver(user, code);
+        String destination = channel == Channel.EMAIL ? user.email() : user.phone();
+        delivery.deliverAfterCommit(user.id(), channel, destination, code, config.resetCodeTtl());
     }
 
     /**
@@ -112,19 +113,7 @@ public class PasswordResetService {
         return authService.issuePair(user.id());
     }
 
-    /**
-     * V1 没有邮件与短信通道，验证码只能落日志。接真实通道时换掉这个方法，其余逻辑不动。
-     */
-    private void deliver(UserRow user, String code) {
-        if (config.logResetCodes()) {
-            log.info("[开发环境] 用户 {} 的找回密码验证码：{}（{} 分钟内有效）",
-                    user.id(), code, config.resetCodeTtl().toMinutes());
-            return;
-        }
-        log.warn("用户 {} 申请了找回密码验证码，但没有配置任何发送通道，验证码无法送达", user.id());
-    }
-
-    private static String channelOf(UserRow user, String account) {
-        return account.equalsIgnoreCase(user.email()) ? EMAIL : PHONE;
+    private static Channel channelOf(UserRow user, String account) {
+        return account.equalsIgnoreCase(user.email()) ? Channel.EMAIL : Channel.PHONE;
     }
 }
