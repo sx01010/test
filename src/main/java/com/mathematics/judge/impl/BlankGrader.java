@@ -7,11 +7,13 @@ import java.util.List;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.mathematics.judge.ExactNumber;
 import com.mathematics.judge.GradeOutcome;
 import com.mathematics.judge.GradeRequest;
 import com.mathematics.judge.GradeResult;
 import com.mathematics.judge.Grader;
 import com.mathematics.judge.GraderConfig;
+import com.mathematics.judge.GraderException;
 import com.mathematics.judge.JsonAnswers;
 import com.mathematics.judge.ProblemType;
 
@@ -85,15 +87,34 @@ public class BlankGrader implements Grader {
         return flags;
     }
 
+    /**
+     * 先比字面，再比数值：标准答案写 {@code 1/2}，学生填 {@code 0.5} 也算对。
+     * 不是数字的写法（如「十二」）只能靠录入时列出别名。
+     */
     private static boolean matchesAlias(String user, List<String> aliases) {
         if (user == null || user.isBlank()) {
             return false;
         }
+        ExactNumber userNumber = tryParse(user);
         for (String alias : aliases) {
             if (alias.equals(user)) {
                 return true;
             }
+            if (userNumber != null) {
+                ExactNumber aliasNumber = tryParse(alias);
+                if (aliasNumber != null && aliasNumber.sameValue(userNumber)) {
+                    return true;
+                }
+            }
         }
         return false;
+    }
+
+    private static ExactNumber tryParse(String text) {
+        try {
+            return ExactNumber.parse(text);
+        } catch (GraderException ex) {
+            return null;
+        }
     }
 }

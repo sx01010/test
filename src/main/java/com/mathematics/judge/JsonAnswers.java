@@ -1,6 +1,5 @@
 package com.mathematics.judge;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -70,16 +69,15 @@ public final class JsonAnswers {
         throw new GraderException("value is not a boolean");
     }
 
-    public static BigDecimal numericValue(JsonNode object) {
+    public static ExactNumber numericValue(JsonNode object) {
         JsonNode value = object.get("value");
         if (value == null || value.isNull()) {
             throw new GraderException("missing field: value");
         }
-        try {
-            return new BigDecimal(value.isNumber() ? value.numberValue().toString() : value.asText().trim());
-        } catch (NumberFormatException ex) {
-            throw new GraderException("value is not a number", ex);
+        if (value.isNumber()) {
+            return ExactNumber.of(value.decimalValue());
         }
+        return ExactNumber.parse(value.asText());
     }
 
     public static List<String> userBlanks(JsonNode object) {

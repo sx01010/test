@@ -635,7 +635,8 @@ function renderAnswerZone(problem) {
 
   if (problem.type === 'NUMERIC') {
     zone.innerHTML = `<div class="blank-row"><label>答案</label>
-      <input class="fill" id="numericInput" placeholder="填入数值" value="${esc(saved.value ?? '')}"></div>`;
+      <input class="fill" id="numericInput" placeholder="如 12、2.5、3/4、1又1/2" aria-describedby="numericHint" value="${esc(saved.value ?? '')}"></div>
+      <p class="hint" id="numericHint">分数写成 3/4，带分数写成 1又1/2 或 1 1/2</p>`;
     $('#numericInput').disabled = locked;
     $('#numericInput').oninput = event => { saved.value = event.target.value.trim(); };
     return;

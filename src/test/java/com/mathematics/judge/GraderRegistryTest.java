@@ -81,8 +81,30 @@ class GraderRegistryTest {
         return Stream.of(
                 Arguments.of("{\"value\":\"3.14\"}", "{\"value\":\"3.14\"}", "{}", GradeOutcome.CORRECT),
                 Arguments.of("{\"value\":3.141}", "{\"value\":\"3.14\"}", "{\"tolerance\":0.01}", GradeOutcome.CORRECT),
-                Arguments.of("{\"value\":\"3.20\"}", "{\"value\":\"3.14\"}", "{\"tolerance\":0.01}", GradeOutcome.WRONG)
+                Arguments.of("{\"value\":\"3.20\"}", "{\"value\":\"3.14\"}", "{\"tolerance\":0.01}", GradeOutcome.WRONG),
+                Arguments.of("{\"value\":\"3/4\"}", "{\"value\":\"0.75\"}", "{}", GradeOutcome.CORRECT),
+                Arguments.of("{\"value\":\"6/8\"}", "{\"value\":\"3/4\"}", "{}", GradeOutcome.CORRECT),
+                Arguments.of("{\"value\":\"1/3\"}", "{\"value\":\"1/3\"}", "{}", GradeOutcome.CORRECT),
+                Arguments.of("{\"value\":\"0.3333\"}", "{\"value\":\"1/3\"}", "{}", GradeOutcome.WRONG),
+                Arguments.of("{\"value\":\"0.3333\"}", "{\"value\":\"1/3\"}", "{\"tolerance\":0.001}", GradeOutcome.CORRECT),
+                Arguments.of("{\"value\":\"1 1/2\"}", "{\"value\":\"3/2\"}", "{}", GradeOutcome.CORRECT),
+                Arguments.of("{\"value\":\"1又1/2\"}", "{\"value\":\"1.5\"}", "{}", GradeOutcome.CORRECT),
+                Arguments.of("{\"value\":\"-2 1/3\"}", "{\"value\":\"-7/3\"}", "{}", GradeOutcome.CORRECT),
+                Arguments.of("{\"value\":\"－３／４\"}", "{\"value\":\"-0.75\"}", "{}", GradeOutcome.CORRECT),
+                Arguments.of("{\"value\":\"50%\"}", "{\"value\":\"1/2\"}", "{}", GradeOutcome.CORRECT)
         );
+    }
+
+    @ParameterizedTest
+    @MethodSource("malformedNumbers")
+    void malformedNumericAnswerRejected(String value) {
+        assertThrows(GraderException.class,
+                () -> grade(ProblemType.NUMERIC, "{\"value\":\"" + value + "\"}", "{\"value\":\"1\"}", "{}"));
+    }
+
+    static Stream<Arguments> malformedNumbers() {
+        return Stream.of(Arguments.of("abc"), Arguments.of("1/0"), Arguments.of("1//2"), Arguments.of("1 2"),
+                Arguments.of(""), Arguments.of("1/2/3"));
     }
 
     @ParameterizedTest
@@ -100,7 +122,8 @@ class GraderRegistryTest {
                 Arguments.of("{\"blanks\":[\"十二\",\"24\"]}", "{\"blanks\":[[\"12\",\"十二\"],[\"24\"]]}", "{}", GradeOutcome.CORRECT, "100.00"),
                 Arguments.of("{\"blanks\":[\"12\",\"0\"]}", "{\"blanks\":[[\"12\"],[\"24\"]]}", "{}", GradeOutcome.PARTIAL, "50.00"),
                 Arguments.of("{\"blanks\":[\"0\",\"0\"]}", "{\"blanks\":[[\"12\"],[\"24\"]]}", "{}", GradeOutcome.WRONG, "0.00"),
-                Arguments.of("{\"blanks\":[\"24\",\"12\"]}", "{\"blanks\":[[\"12\"],[\"24\"]]}", "{\"orderIndependent\":true}", GradeOutcome.CORRECT, "100.00")
+                Arguments.of("{\"blanks\":[\"24\",\"12\"]}", "{\"blanks\":[[\"12\"],[\"24\"]]}", "{\"orderIndependent\":true}", GradeOutcome.CORRECT, "100.00"),
+                Arguments.of("{\"blanks\":[\"0.5\",\"2/4\"]}", "{\"blanks\":[[\"1/2\"],[\"0.5\"]]}", "{}", GradeOutcome.CORRECT, "100.00")
         );
     }
 
