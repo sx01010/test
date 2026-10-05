@@ -249,7 +249,8 @@ function openAuthModal(mode) {
     ${isLogin ? '' : '<div class="field"><label>昵称</label><input id="authNickname" maxlength="32" placeholder="怎么称呼你"></div>'}
     <div class="field"><label>邮箱${isLogin ? '或手机号' : ''}</label><input id="authAccount" placeholder="demo@mathematics.local"></div>
     <div class="field"><label>密码（至少 8 位）</label><input id="authPassword" type="password" placeholder="demo12345"></div>
-    ${isLogin ? '<button class="link-btn" id="authForgot">忘记密码</button>' : ''}
+    ${isLogin ? '<button class="link-btn" id="authForgot">忘记密码</button>'
+              : '<p class="hint">注册即表示你已阅读并同意<a href="/privacy.html" target="_blank" rel="noopener">《隐私政策》</a>；不满 14 周岁请在家长陪同下注册</p>'}
     <div class="divider-text">${isLogin ? '还没有账号' : '已经有账号'}</div>
     <button class="btn" style="width:100%" id="authSwitch">${isLogin ? '去注册' : '去登录'}</button>
     <div class="modal-foot">
@@ -366,6 +367,10 @@ function openSettingsModal() {
     </div>
     <div class="divider-text">账号</div>
     <button class="btn" style="width:100%" id="doLogout">退出登录</button>
+    <div class="settings-links">
+      <a href="/privacy.html" target="_blank" rel="noopener">隐私政策</a>
+      <button class="link-btn danger-link" id="doDelete">注销账号</button>
+    </div>
     <div class="modal-foot">
       <button class="btn" data-close>取消</button>
       <button class="btn btn-primary" id="saveSettings">保存</button>
@@ -382,15 +387,10 @@ function openSettingsModal() {
     if (pair?.refreshToken) {
       await api('/auth/logout', { method: 'POST', body: { refreshToken: pair.refreshToken } }).catch(() => {});
     }
-    clearTokens();
-    S.me = null;
-    S.results = {};
-    S.today = { done: 0, correct: 0 };
-    syncAuth();
-    closeModal();
-    updateTodayPanel();
+    forgetSession();
     toast('已退出登录');
   };
+  $('#doDelete').onclick = () => openDeleteAccountModal();
   $('#saveSettings').onclick = async () => {
     const practiceMode = $('#mask .radio.on').dataset.practice === '1';
     try {
@@ -401,6 +401,39 @@ function openSettingsModal() {
       syncAuth();
       closeModal();
       toast(practiceMode ? '已开启练习模式' : '已关闭练习模式');
+    } catch (error) {
+      toast(error.message);
+    }
+  };
+}
+
+function forgetSession() {
+  clearTokens();
+  S.me = null;
+  S.results = {};
+  S.today = { done: 0, correct: 0 };
+  syncAuth();
+  closeModal();
+  updateTodayPanel();
+}
+
+function openDeleteAccountModal() {
+  openModal(`
+    <h3>注销账号</h3>
+    <p>注销后昵称、邮箱、手机号会被清除，所有设备立即退出登录，账号无法恢复。
+       已有的作答记录只以匿名形式保留在题目统计里。</p>
+    <div class="field"><label>输入密码确认</label><input id="delPassword" type="password" autocomplete="current-password"></div>
+    <div class="modal-foot">
+      <button class="btn" data-close>再想想</button>
+      <button class="btn btn-danger" id="delSubmit">确认注销</button>
+    </div>`);
+  $('#delSubmit').onclick = async () => {
+    const password = $('#delPassword').value;
+    if (!password) return toast('请输入密码');
+    try {
+      await api('/users/me', { method: 'DELETE', body: { password } });
+      forgetSession();
+      toast('账号已注销');
     } catch (error) {
       toast(error.message);
     }

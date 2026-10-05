@@ -23,6 +23,9 @@ public final class IdentityDtos {
     public record LoginRequest(@NotBlank String account, @NotBlank String password) {
     }
 
+    public record DeleteAccountRequest(@NotBlank(message = "请输入密码确认注销") String password) {
+    }
+
     public record RefreshRequest(@NotBlank String refreshToken) {
     }
 

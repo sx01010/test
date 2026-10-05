@@ -29,8 +29,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 /**
  * R20 找回密码。
  *
- * <p>验证码送不出去（没有邮件或短信通道），所以测试直接从库里把那一行读出来、
+ * <p>默认配置下不开邮件通道，所以测试直接从库里把那一行读出来、
  * 用已知的候选码去比对哈希。这同时顺带验证了「库里存的不是明文」。
+ * 真正经邮件送达的路径见 {@link PasswordResetMailIntegrationTest}。
  */
 @SpringBootTest(properties =
         "spring.datasource.url=jdbc:h2:mem:password-reset;MODE=MySQL;DATABASE_TO_LOWER=TRUE;"

@@ -113,6 +113,20 @@ public class UserRepository {
     }
 
     /**
+     * 注销即匿名化：联系方式清空后唯一索引空出来，这个邮箱可以重新注册；
+     * 密码哈希换成 BCrypt 永远匹配不上的值，账号行留着给提交记录和工单做外键。
+     */
+    public void anonymize(long userId) {
+        jdbc.update("""
+                UPDATE `user`
+                   SET nickname = '已注销用户', email = NULL, phone = NULL, password_hash = '!deleted',
+                       avatar_preset = 0, practice_mode = 0, status = 'DELETED', fail_count = 0,
+                       locked_until = NULL, deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                 WHERE id = ?
+                """, userId);
+    }
+
+    /**
      * 只更新传进来的字段。用动态 SQL 而不是 COALESCE(?, col)：未绑定类型的 NULL 参数在 H2 上会被拒。
      */
     public void updateProfile(long userId, String nickname, Integer avatarPreset, Boolean practiceMode) {
