@@ -187,7 +187,30 @@
         <button type="button" class="chip on" role="tab" data-admin-tab="author" aria-selected="true">录题</button>
         <button type="button" class="chip" role="tab" data-admin-tab="feedback" aria-selected="false">纠错</button>
         <button type="button" class="chip" role="tab" data-admin-tab="material" aria-selected="false">资料</button>
+        <button type="button" class="chip" role="tab" data-admin-tab="dashboard" aria-selected="false">看板</button>
       </div>
+    </div>
+
+    <div id="adminDashboard" hidden>
+      <div class="dash-head">
+        <label for="dashDays">时间范围</label>
+        <select id="dashDays">
+          <option value="7">近 7 天</option>
+          <option value="14" selected>近 14 天</option>
+          <option value="30">近 30 天</option>
+          <option value="60">近 60 天</option>
+        </select>
+      </div>
+      <div class="dash-kpis" id="dashKpis"></div>
+      <section class="card dash-card">
+        <h3>每日活跃与作答</h3>
+        <div class="table-scroll"><table class="dash-table" id="dashDaysTable"></table></div>
+      </section>
+      <section class="card dash-card">
+        <h3>新用户留存</h3>
+        <p class="hint">按注册日分批：D1 为次日回来作答的比例，D7 为第 7 天回来作答的比例。「—」表示还没到观察日。</p>
+        <div class="table-scroll"><table class="dash-table" id="dashCohortTable"></table></div>
+      </section>
     </div>
 
     <div id="adminAuthor">

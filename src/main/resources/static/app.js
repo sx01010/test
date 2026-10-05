@@ -1391,6 +1391,8 @@ function refreshAdminTab() {
     loadFeedbackQueue().catch(error => toast(error.message));
   } else if (S.admin.tab === 'material') {
     loadAdminMaterialList().catch(error => toast(error.message));
+  } else if (S.admin.tab === 'dashboard') {
+    loadDashboard().catch(error => toast(error.message));
   } else {
     refreshAdminList();
   }
@@ -1475,13 +1477,14 @@ const FEEDBACK_REASON = {
   OTHER: '其他'
 };
 
-const ADMIN_TAB_HEADING = { author: '题目录入', feedback: '纠错处理', material: '资料管理' };
+const ADMIN_TAB_HEADING = { author: '题目录入', feedback: '纠错处理', material: '资料管理', dashboard: '运营看板' };
 
 function showAdminTab(tab) {
   S.admin.tab = tab;
   $('#adminAuthor').hidden = tab !== 'author';
   $('#adminFeedback').hidden = tab !== 'feedback';
   $('#adminMaterial').hidden = tab !== 'material';
+  $('#adminDashboard').hidden = tab !== 'dashboard';
   $('#adminHeading').textContent = ADMIN_TAB_HEADING[tab] || '题目录入';
   $$('#adminTabs [data-admin-tab]').forEach(button => {
     const on = button.dataset.adminTab === tab;
@@ -1489,6 +1492,37 @@ function showAdminTab(tab) {
     button.setAttribute('aria-selected', on ? 'true' : 'false');
   });
   refreshAdminTab();
+}
+
+/* ========================= 运营看板 ========================= */
+
+const pct = value => (value === null || value === undefined ? '—' : `${(value * 100).toFixed(1)}%`);
+
+async function loadDashboard() {
+  const data = await api(`/admin/dashboard?days=${$('#dashDays').value}`);
+  const s = data.summary;
+  $('#dashKpis').innerHTML = [
+    ['今日活跃', s.activeToday],
+    ['近 7 天活跃', s.activeLast7Days],
+    ['今日作答', s.submissionsToday],
+    ['注册用户', s.totalUsers]
+  ].map(([label, value]) => `<div class="card dash-kpi"><b>${value}</b><small>${label}</small></div>`).join('');
+
+  // 最新的一天放最上面，运营每天打开先看今天
+  const days = [...data.days].reverse();
+  $('#dashDaysTable').innerHTML = `
+    <thead><tr><th>日期</th><th>活跃</th><th>新增</th><th>作答</th><th>人均作答</th><th>正确率</th></tr></thead>
+    <tbody>${days.map(day => `<tr>
+      <td>${day.date.slice(5)}</td><td>${day.activeUsers}</td><td>${day.newUsers}</td><td>${day.submissions}</td>
+      <td>${day.submissionsPerActiveUser == null ? '—' : Number(day.submissionsPerActiveUser).toFixed(1)}</td><td>${pct(day.correctRate)}</td></tr>`).join('')}</tbody>`;
+
+  const cohorts = [...data.cohorts].reverse().filter(cohort => cohort.size > 0);
+  $('#dashCohortTable').innerHTML = cohorts.length
+    ? `<thead><tr><th>注册日</th><th>人数</th><th>D1</th><th>D7</th></tr></thead>
+       <tbody>${cohorts.map(cohort => `<tr>
+         <td>${cohort.date.slice(5)}</td><td>${cohort.size}</td><td>${pct(cohort.d1)}</td><td>${pct(cohort.d7)}</td>
+       </tr>`).join('')}</tbody>`
+    : '<tbody><tr><td class="hint">这段时间没有新注册用户</td></tr></tbody>';
 }
 
 function showFeedbackResult(message) {
@@ -1503,6 +1537,7 @@ function setupFeedbackQueue() {
     button.onclick = () => showAdminTab(button.dataset.adminTab);
   });
   $('#fbStatusFilter').onchange = () => loadFeedbackQueue().catch(error => toast(error.message));
+  $('#dashDays').onchange = () => loadDashboard().catch(error => toast(error.message));
 }
 
 async function loadFeedbackQueue() {

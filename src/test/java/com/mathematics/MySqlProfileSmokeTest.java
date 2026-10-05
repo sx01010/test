@@ -158,6 +158,21 @@ class MySqlProfileSmokeTest {
                 .andExpect(header().string("Content-Type", "image/png"));
     }
 
+    /** CAST(created_at AS DATE) 在 MySQL 上要和 JVM 时区对上，否则今天交的题会算到昨天。 */
+    @Test
+    void dashboardCountsTodaysSubmissionOnRealMySql() throws Exception {
+        String token = registerToken();
+        jdbc.update("UPDATE `user` SET role = 'ADMIN' WHERE id = ?", userId(token));
+        submit(token, 1, currentVersionId(1), "{\"choice\":\"B\"}");
+
+        MvcResult result = mockMvc.perform(get("/api/v1/admin/dashboard").param("days", "7")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk()).andReturn();
+        JsonNode summary = objectMapper.readTree(result.getResponse().getContentAsString()).get("summary");
+        assertTrue(summary.get("activeToday").asInt() >= 1, summary.toString());
+        assertTrue(summary.get("submissionsToday").asInt() >= 1, summary.toString());
+    }
+
     private int count(String table) {
         Integer rows = jdbc.queryForObject("SELECT COUNT(*) FROM `" + table + "`", Integer.class);
         return rows == null ? 0 : rows;
