@@ -22,6 +22,8 @@ spring:
     # 默认挂 seed：本地用 MySQL 当持久化开发库时，题库不能是空的。
     # 正式环境把 FLYWAY_LOCATIONS 设成 classpath:db/migration/mysql，示例题就不会进去。
     locations: ${FLYWAY_LOCATIONS:classpath:db/migration/mysql,classpath:db/seed/mysql}
+    # 同默认 profile：开发库跑过 V90 种子后还要能补 V8 之后的结构迁移
+    out-of-order: true
 
 mathematics:
   auth:

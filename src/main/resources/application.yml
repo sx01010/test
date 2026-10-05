@@ -19,6 +19,9 @@ spring:
     # {vendor} 解析成 h2 或 mysql：题干全文索引、JSON 列、生成列只在 MySQL 脚本里。
     # 开发 profile 额外挂 seed 目录，灌入知识点树与 5 道示例题。
     locations: classpath:db/migration/{vendor},classpath:db/seed/{vendor}
+    # 种子脚本编号是 V90，已经跑过种子的开发库再加 V8、V9 时，Flyway 默认会因为「比已应用的最高版本还小」拒绝启动。
+    # 打开乱序执行，新的结构迁移照常补上；正式环境不挂 seed，这个开关在那边不改变任何行为。
+    out-of-order: true
 
   jackson:
     default-property-inclusion: non_null

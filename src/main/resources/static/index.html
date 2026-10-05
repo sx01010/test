@@ -236,6 +236,7 @@
               <label for="apStem">题干</label>
               <textarea id="apStem" rows="5" spellcheck="false"></textarea>
               <p class="field-hint">支持 Markdown 的 <code>**加粗**</code> 与 <code>- 列表项</code>；行内公式用反斜杠加圆括号包起来，独立公式用反斜杠加方括号。</p>
+              <button type="button" class="btn btn-sm" data-insert-image="apStem">插入配图</button>
             </div>
           </div>
 
@@ -246,6 +247,8 @@
               <label for="apExplanation">解析</label>
               <textarea id="apExplanation" rows="5" spellcheck="false"></textarea>
               <p class="field-hint">必填，自己撰写。解析是 V1 的核心内容，不抄原始出处。</p>
+              <button type="button" class="btn btn-sm" data-insert-image="apExplanation">插入配图</button>
+              <input type="file" id="apImageFile" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden>
             </div>
           </div>
 

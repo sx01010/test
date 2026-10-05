@@ -73,8 +73,9 @@ function esc(text) {
 }
 
 /**
- * 题干与解析是 Markdown + LaTeX。这里只支持粗体、段落和无序列表，
+ * 题干与解析是 Markdown + LaTeX。这里只支持粗体、段落、无序列表和站内配图，
  * 公式交给 KaTeX；先转义再替换，避免题库内容里的 HTML 被执行。
+ * 配图只认 asset: 前缀的对象键，不支持任意外链，否则题库内容能把学生的浏览器引到任何地方。
  */
 function md(text) {
   if (!text) return '';
@@ -87,7 +88,10 @@ function md(text) {
   }).join('');
 }
 function inline(text) {
-  return text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  return text
+    .replace(/!\[([^\]]*)\]\(asset:([A-Za-z0-9_-]{32})\)/g,
+      '<img class="md-img" src="/api/v1/assets/$2" alt="$1" loading="lazy">')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
 }
 
 function typeset(root) {
@@ -1074,7 +1078,44 @@ function setupAdmin() {
   $('#apReset').onclick = resetAdminForm;
   $('#apSaveDraft').onclick = () => saveAdminProblem(false);
   $('#apPublish').onclick = () => saveAdminProblem(true);
+  setupImageInsert();
   resetAdminForm();
+}
+
+/** 选图 → 上传 → 在光标处插入 ![](asset:键)。同一张图重复上传，服务端会复用已有的键。 */
+function setupImageInsert() {
+  const picker = $('#apImageFile');
+  let target = null;
+  $$('[data-insert-image]').forEach(button => {
+    button.onclick = () => {
+      target = $(`#${button.dataset.insertImage}`);
+      picker.value = '';
+      picker.click();
+    };
+  });
+  picker.onchange = async () => {
+    const file = picker.files[0];
+    if (!file || !target) return;
+    if (file.size > 2 * 1024 * 1024) return showAdminError('图片不能超过 2 MB');
+    try {
+      const response = await fetch('/api/v1/admin/assets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/octet-stream', Authorization: `Bearer ${tokens().accessToken}` },
+        body: await file.arrayBuffer()
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.message || '上传失败');
+      const at = target.selectionStart ?? target.value.length;
+      const snippet = `\n\n${payload.markdown}\n\n`;
+      target.value = target.value.slice(0, at) + snippet + target.value.slice(target.selectionEnd ?? at);
+      target.focus();
+      target.selectionStart = target.selectionEnd = at + snippet.length;
+      hideAdminError();
+      toast('配图已插入');
+    } catch (error) {
+      showAdminError(error.message);
+    }
+  };
 }
 
 function optionRow(type, key, textMd, checked) {
