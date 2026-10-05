@@ -86,7 +86,10 @@ public class ProblemRepository {
             args.add(query.originType());
         }
         if (query.tagId() != null) {
-            sql.append(" AND EXISTS (SELECT 1 FROM problem_tag pt WHERE pt.problem_id = p.id AND pt.tag_id = ?) ");
+            // 知识点树只有两级：选一级节点时连同它的子节点一起筛
+            sql.append(" AND EXISTS (SELECT 1 FROM problem_tag pt JOIN tag t ON t.id = pt.tag_id"
+                    + " WHERE pt.problem_id = p.id AND (t.id = ? OR t.parent_id = ?)) ");
+            args.add(query.tagId());
             args.add(query.tagId());
         }
         if (query.keyword() != null) {

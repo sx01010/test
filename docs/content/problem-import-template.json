@@ -1,0 +1,77 @@
+{
+  "items": [
+    {
+      "title": "鸡兔同笼 · 35 头 94 脚",
+      "type": "SINGLE",
+      "difficulty": 2,
+      "grade": "四年级",
+      "stemMd": "笼子里有鸡和兔共 **35** 只，数一数共有 **94** 只脚。兔有多少只？",
+      "options": [
+        {"key": "A", "textMd": "10 只"},
+        {"key": "B", "textMd": "12 只"},
+        {"key": "C", "textMd": "15 只"},
+        {"key": "D", "textMd": "23 只"}
+      ],
+      "answerJson": {"choice": "B"},
+      "explanationMd": "假设 35 只全是鸡，应有 \\(35 \\times 2 = 70\\) 只脚，比实际少 \\(94 - 70 = 24\\) 只。\n\n每把一只鸡换成兔，脚数多 2，所以兔有 \\(24 \\div 2 = 12\\) 只。",
+      "tagSlugs": ["wp-chicken-rabbit"],
+      "source": {"originType": "ORIGINAL"},
+      "publish": false
+    },
+    {
+      "title": "50 到 60 之间的质数",
+      "type": "MULTI",
+      "difficulty": 2,
+      "grade": "五年级",
+      "stemMd": "下面哪些数是质数？（多选）",
+      "options": [
+        {"key": "A", "textMd": "51"},
+        {"key": "B", "textMd": "53"},
+        {"key": "C", "textMd": "57"},
+        {"key": "D", "textMd": "59"}
+      ],
+      "answerJson": {"choices": ["B", "D"]},
+      "explanationMd": "\\(51 = 3 \\times 17\\)，\\(57 = 3 \\times 19\\)，都是合数（各位数字和是 3 的倍数，能被 3 整除）。\n\n53 和 59 不能被 2、3、5、7 整除，而 \\(7^2 = 49 < 59 < 64 = 8^2\\)，所以它们是质数。",
+      "tagSlugs": ["nt-primes"],
+      "source": {"originType": "ORIGINAL"},
+      "publish": false
+    },
+    {
+      "title": "13 个人的生日月份",
+      "type": "JUDGE",
+      "difficulty": 2,
+      "grade": "四年级",
+      "stemMd": "任意 13 个人中，一定至少有 2 个人的生日在同一个月。",
+      "answerJson": {"value": true},
+      "explanationMd": "一年只有 12 个月，把 13 个人按生日月份放进 12 个「抽屉」，至少有一个抽屉里有 2 个人。",
+      "tagSlugs": ["comb-pigeonhole"],
+      "source": {"originType": "ORIGINAL"},
+      "publish": false
+    },
+    {
+      "title": "裂项求和 · 到 9×10",
+      "type": "NUMERIC",
+      "difficulty": 3,
+      "grade": "六年级",
+      "stemMd": "计算：\\(\\dfrac{1}{1 \\times 2} + \\dfrac{1}{2 \\times 3} + \\dfrac{1}{3 \\times 4} + \\cdots + \\dfrac{1}{9 \\times 10}\\)（结果写成最简分数）",
+      "answerJson": {"value": "9/10"},
+      "graderConfig": {"tolerance": 0},
+      "explanationMd": "每一项都能拆成两项之差：\\(\\dfrac{1}{n(n+1)} = \\dfrac{1}{n} - \\dfrac{1}{n+1}\\)。\n\n相加后中间各项正负抵消，只剩 \\(1 - \\dfrac{1}{10} = \\dfrac{9}{10}\\)。",
+      "tagSlugs": ["calc-fractions", "calc-series"],
+      "source": {"originType": "ORIGINAL"},
+      "publish": false
+    },
+    {
+      "title": "顺水与逆水",
+      "type": "BLANK",
+      "difficulty": 2,
+      "grade": "五年级",
+      "stemMd": "一艘船顺水每小时行 **20** 千米，逆水每小时行 **12** 千米。船在静水中的速度是每小时（ ）千米，水流速度是每小时（ ）千米。",
+      "answerJson": {"blanks": [["16"], ["4"]]},
+      "explanationMd": "顺水速度 = 船速 + 水速，逆水速度 = 船速 − 水速。\n\n船速 \\(= (20 + 12) \\div 2 = 16\\)，水速 \\(= (20 - 12) \\div 2 = 4\\)。",
+      "tagSlugs": ["travel-boat"],
+      "source": {"originType": "ORIGINAL"},
+      "publish": false
+    }
+  ]
+}

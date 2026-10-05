@@ -6,6 +6,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -66,6 +68,29 @@ class ProblemBulkImportIntegrationTest {
         JsonNode forbidden = perform(post("/api/v1/admin/problems/import"), body,
                 studentToken, status().isForbidden());
         assertEquals("FORBIDDEN", forbidden.get("code").asText());
+    }
+
+    /** 给内容组的模板必须能原样导入：格式一改、模板没跟着改，这里先红。 */
+    @Test
+    void contentTemplateImportsCleanlyWithTagSlugs() throws Exception {
+        String template = Files.readString(Path.of("docs/content/problem-import-template.json"));
+        JsonNode result = perform(post("/api/v1/admin/problems/import"), template, adminToken, status().isOk());
+
+        assertEquals(5, result.get("succeeded").asInt(), result.toString());
+        assertEquals(0, result.get("failed").size(), result.toString());
+        assertEquals(2, jdbc.queryForObject("""
+                SELECT COUNT(*) FROM problem_tag pt JOIN problem p ON p.id = pt.problem_id
+                 WHERE p.title = '裂项求和 · 到 9×10'
+                """, Integer.class), "两个 slug 都应解析成知识点");
+    }
+
+    @Test
+    void unknownTagSlugFailsThatLineOnly() throws Exception {
+        String bad = item("坏 slug", "B", false).replace("\"tagIds\":[1]", "\"tagSlugs\":[\"no-such-tag\"]");
+        JsonNode result = perform(post("/api/v1/admin/problems/import"),
+                importBody(bad, item("slug 的好邻居", "A", false)), adminToken, status().isOk());
+        assertEquals(1, result.get("succeeded").asInt());
+        assertTrue(result.get("failed").get(0).get("reason").asText().contains("no-such-tag"));
     }
 
     @Test

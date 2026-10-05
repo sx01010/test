@@ -471,7 +471,13 @@ $('#kw').oninput = event => {
 
 async function loadTags() {
   S.tags = await api('/tags');
-  const options = S.tags.map(tag => `<option value="${tag.id}">${esc(tag.name)}</option>`).join('');
+  // 接口按 (父, 排序) 平铺返回；这里排成「一级 → 它的子节点」，子节点缩进
+  const roots = S.tags.filter(tag => !tag.parentId);
+  const childrenOf = id => S.tags.filter(tag => tag.parentId === id);
+  const options = roots.map(root => [
+    `<option value="${root.id}">${esc(root.name)}</option>`,
+    ...childrenOf(root.id).map(child => `<option value="${child.id}">\u3000${esc(child.name)}</option>`)
+  ].join('')).join('');
   $('#tagFilter').insertAdjacentHTML('beforeend', options);
   $('#apTags').innerHTML = options;
   $('#tagFilter').onchange = event => {

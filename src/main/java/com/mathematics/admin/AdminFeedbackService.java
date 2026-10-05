@@ -107,7 +107,7 @@ public class AdminFeedbackService {
     private static UpsertProblemRequest withProblemId(UpsertProblemRequest source, Ticket ticket) {
         return new UpsertProblemRequest(ticket.problemId(), source.title(), source.type(), source.difficulty(),
                 source.grade(), source.stemMd(), source.options(), source.answerJson(), source.explanationMd(),
-                source.graderConfig(), source.maxScore(), source.tagIds(), source.source(), source.changeNote(),
+                source.graderConfig(), source.maxScore(), source.tagIds(), source.tagSlugs(), source.source(), source.changeNote(),
                 true);
     }
 

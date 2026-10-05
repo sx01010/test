@@ -1,5 +1,6 @@
 package com.mathematics.admin;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -163,7 +164,7 @@ public class AdminProblemService {
         Set<String> optionKeys = validateOptions(type, options);
         validateAnswer(type, answer, graderConfig, maxScore, optionKeys);
 
-        List<Long> tagIds = requireExistingTags(request.tagIds());
+        List<Long> tagIds = requireExistingTags(request.tagIds(), request.tagSlugs());
         SourceInput source = normalizeSource(request.source());
         if (request.publish()) {
             requireCompleteSource(source);
@@ -245,8 +246,19 @@ public class AdminProblemService {
         }
     }
 
-    private List<Long> requireExistingTags(List<Long> tagIds) {
-        List<Long> distinct = tagIds.stream().filter(Objects::nonNull).distinct().toList();
+    private List<Long> requireExistingTags(List<Long> tagIds, List<String> tagSlugs) {
+        List<Long> ids = new ArrayList<>(tagIds == null ? List.of() : tagIds);
+        List<String> slugs = tagSlugs == null ? List.of()
+                : tagSlugs.stream().filter(Objects::nonNull).map(String::trim).distinct().toList();
+        if (!slugs.isEmpty()) {
+            Map<String, Long> found = admin.tagIdsBySlug(slugs);
+            List<String> missing = slugs.stream().filter(slug -> !found.containsKey(slug)).toList();
+            if (!missing.isEmpty()) {
+                throw ApiException.invalid("知识点不存在：" + String.join("、", missing));
+            }
+            slugs.forEach(slug -> ids.add(found.get(slug)));
+        }
+        List<Long> distinct = ids.stream().filter(Objects::nonNull).distinct().toList();
         if (distinct.isEmpty()) {
             throw ApiException.invalid("至少挂一个知识点");
         }

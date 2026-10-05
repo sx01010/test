@@ -2,7 +2,9 @@ package com.mathematics.admin;
 
 import java.sql.PreparedStatement;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -261,6 +263,15 @@ public class AdminProblemRepository {
         Integer count = named.queryForObject("SELECT COUNT(1) FROM tag WHERE id IN (:ids)",
                 new MapSqlParameterSource("ids", tagIds), Integer.class);
         return count == null ? 0 : count;
+    }
+
+    public Map<String, Long> tagIdsBySlug(List<String> slugs) {
+        Map<String, Long> result = new HashMap<>();
+        named.query("SELECT id, slug FROM tag WHERE slug IN (:slugs)", new MapSqlParameterSource("slugs", slugs),
+                rs -> {
+                    result.put(rs.getString("slug"), rs.getLong("id"));
+                });
+        return result;
     }
 
     public List<AdminProblemSummary> list(String status, int limit) {

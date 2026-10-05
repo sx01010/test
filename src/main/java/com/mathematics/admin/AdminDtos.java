@@ -30,7 +30,9 @@ public final class AdminDtos {
             @NotBlank(message = "解析必填，V1 要求自己撰写") String explanationMd,
             JsonNode graderConfig,
             Integer maxScore,
-            @NotEmpty(message = "至少挂一个知识点") List<Long> tagIds,
+            List<Long> tagIds,
+            // 批量导入的题目文件跨环境复用，库里的 id 各环境不同，slug 才稳定；两者可以混用
+            List<String> tagSlugs,
             @NotNull(message = "来源登记不能为空") @Valid SourceInput source,
             @Size(max = 256, message = "变更说明最长 256 字") String changeNote,
             boolean publish) {
