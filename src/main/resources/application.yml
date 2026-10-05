@@ -57,7 +57,17 @@ mathematics:
     # 留空则启动时随机生成一把并打 WARN。不给硬编码默认值：写在仓库里的密钥等于没有签名。
     signing-secret: ${MATERIAL_SIGNING_SECRET:}
 
+  rate-limit:
+    enabled: true
+    # 单机开发用内存计数；mysql profile 切到 redis
+    store: memory
+    trust-forwarded-for: false
+
 management:
+  health:
+    # 默认 profile 不连 Redis，别让健康检查因为一个没用到的组件报 DOWN
+    redis:
+      enabled: false
   endpoints:
     web:
       exposure:

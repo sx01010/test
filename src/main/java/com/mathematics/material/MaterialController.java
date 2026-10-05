@@ -13,6 +13,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.mathematics.guard.RateLimit;
+import com.mathematics.guard.RateLimit.By;
+import com.mathematics.guard.RequireLogin;
 import com.mathematics.identity.CurrentUser;
 import com.mathematics.material.MaterialDtos.DownloadUrlResponse;
 import com.mathematics.material.MaterialDtos.MaterialSummary;
@@ -43,6 +46,8 @@ public class MaterialController {
     }
 
     @PostMapping("/{id}/download-url")
+    @RequireLogin
+    @RateLimit(name = "download-url", limit = 30, window = "PT10M", by = By.USER_OR_IP)
     public DownloadUrlResponse downloadUrl(CurrentUser me, @PathVariable long id) {
         return materials.createDownloadUrl(me.requireId(), id);
     }

@@ -8,6 +8,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.mathematics.guard.RateLimit;
+import com.mathematics.guard.RateLimit.By;
 import com.mathematics.identity.CurrentUser;
 import com.mathematics.problem.ProblemDtos.ExplanationResponse;
 import com.mathematics.problem.ProblemDtos.ProblemDetail;
@@ -43,7 +45,13 @@ public class ProblemController {
         return problemService.detail(id);
     }
 
+    /**
+     * R06 按用户与 IP 双重限流：解析接口带标准答案，不限流等于允许脚本把整个题库的答案扒走。
+     * IP 额度放宽，同一个教室或家庭共用出口 IP 时不至于互相挤占。
+     */
     @GetMapping("/{id}/explanation")
+    @RateLimit(name = "explanation-user", limit = 60, window = "PT1M", by = By.USER_OR_IP)
+    @RateLimit(name = "explanation-ip", limit = 300, window = "PT1M")
     public ExplanationResponse explanation(@PathVariable long id, CurrentUser me) {
         return problemService.explanation(id, me);
     }

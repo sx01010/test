@@ -16,15 +16,16 @@ import com.mathematics.admin.AdminDtos.ImportProblemsRequest;
 import com.mathematics.admin.AdminDtos.ImportProblemsResponse;
 import com.mathematics.admin.AdminDtos.UpsertProblemRequest;
 import com.mathematics.admin.AdminDtos.UpsertProblemResponse;
+import com.mathematics.guard.RequireAdmin;
 import com.mathematics.identity.CurrentUser;
 
 import jakarta.validation.Valid;
 
 /**
- * 管理端题库接口。没有 Spring Security 过滤器链，权限在每个方法里显式要求，
- * 和项目其它接口的口径保持一致。
+ * 管理端题库接口。整个类要求管理员，由 {@link com.mathematics.guard.AccessAspect} 统一校验。
  */
 @RestController
+@RequireAdmin
 @RequestMapping("/api/v1/admin/problems")
 public class AdminProblemController {
 
@@ -38,7 +39,6 @@ public class AdminProblemController {
 
     @PostMapping
     public UpsertProblemResponse upsert(CurrentUser me, @Valid @RequestBody UpsertProblemRequest request) {
-        me.requireAdmin();
         return adminProblems.upsert(me.requireId(), request);
     }
 
@@ -49,22 +49,18 @@ public class AdminProblemController {
     @PostMapping("/import")
     public ImportProblemsResponse importProblems(CurrentUser me,
                                                  @Valid @RequestBody ImportProblemsRequest request) {
-        me.requireAdmin();
         return adminImports.importProblems(me.requireId(), request);
     }
 
     @GetMapping
-    public List<AdminProblemSummary> list(CurrentUser me,
-                                         @RequestParam(required = false) String status,
+    public List<AdminProblemSummary> list(@RequestParam(required = false) String status,
                                          @RequestParam(required = false) Integer limit) {
-        me.requireAdmin();
         return adminProblems.list(status, limit);
     }
 
     /** 唯一会返回答案与内部来源字段的读接口，只对管理员开放。 */
     @GetMapping("/{id}")
-    public AdminProblemDetail detail(CurrentUser me, @PathVariable long id) {
-        me.requireAdmin();
+    public AdminProblemDetail detail(@PathVariable long id) {
         return adminProblems.detail(id);
     }
 }

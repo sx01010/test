@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.mathematics.guard.RequireLogin;
 import com.mathematics.identity.IdentityDtos.UpdateProfileRequest;
 import com.mathematics.identity.IdentityDtos.UserProfile;
 import com.mathematics.support.ApiException;
@@ -13,6 +14,7 @@ import com.mathematics.support.ApiException;
 import jakarta.validation.Valid;
 
 @RestController
+@RequireLogin
 @RequestMapping("/api/v1/users/me")
 public class UserController {
 

@@ -17,6 +17,7 @@ public enum ErrorCode {
     ACCOUNT_EXISTS(HttpStatus.CONFLICT),
     PROBLEM_VERSION_STALE(HttpStatus.CONFLICT),
     ACCOUNT_LOCKED(HttpStatus.LOCKED),
+    RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR);
 
     private final HttpStatus status;

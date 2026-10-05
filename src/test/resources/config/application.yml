@@ -1,0 +1,6 @@
+# classpath:/config/ 比 classpath:/ 优先级高，只覆盖这里写到的键，其余仍取 src/main/resources/application.yml。
+# 集成测试在同一个 MockMvc（同一个 127.0.0.1）里连续注册、登录几十次，开着限流会互相打挂。
+# 限流本身由 RateLimitIntegrationTest 显式打开后单独验证。
+mathematics:
+  rate-limit:
+    enabled: false

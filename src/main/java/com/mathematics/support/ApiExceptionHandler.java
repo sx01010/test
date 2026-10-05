@@ -15,6 +15,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
+import com.mathematics.guard.RateLimitedException;
+
 @RestControllerAdvice
 public class ApiExceptionHandler {
 
@@ -22,7 +24,11 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(ApiException.class)
     public ResponseEntity<Map<String, Object>> handleApi(ApiException ex) {
-        return ResponseEntity.status(ex.code().status()).body(body(ex.code(), ex.getMessage(), null));
+        ResponseEntity.BodyBuilder response = ResponseEntity.status(ex.code().status());
+        if (ex instanceof RateLimitedException limited) {
+            response.header("Retry-After", String.valueOf(limited.retryAfterSeconds()));
+        }
+        return response.body(body(ex.code(), ex.getMessage(), null));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

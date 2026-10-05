@@ -12,12 +12,10 @@ import jakarta.servlet.http.HttpServletRequest;
 @Component
 public class CurrentUserArgumentResolver implements HandlerMethodArgumentResolver {
 
-    private static final String BEARER = "Bearer ";
+    private final CurrentUserResolver currentUsers;
 
-    private final AuthService authService;
-
-    public CurrentUserArgumentResolver(AuthService authService) {
-        this.authService = authService;
+    public CurrentUserArgumentResolver(CurrentUserResolver currentUsers) {
+        this.currentUsers = currentUsers;
     }
 
     @Override
@@ -28,15 +26,6 @@ public class CurrentUserArgumentResolver implements HandlerMethodArgumentResolve
     @Override
     public Object resolveArgument(MethodParameter parameter, ModelAndViewContainer mavContainer,
                                   NativeWebRequest webRequest, WebDataBinderFactory binderFactory) {
-        HttpServletRequest request = webRequest.getNativeRequest(HttpServletRequest.class);
-        if (request == null) {
-            return CurrentUser.anonymous();
-        }
-        String header = request.getHeader("Authorization");
-        if (header == null || !header.startsWith(BEARER)) {
-            return CurrentUser.anonymous();
-        }
-        String token = header.substring(BEARER.length()).trim();
-        return authService.resolveAccessToken(token).orElseGet(CurrentUser::anonymous);
+        return currentUsers.resolve(webRequest.getNativeRequest(HttpServletRequest.class));
     }
 }

@@ -13,14 +13,16 @@ import org.springframework.web.bind.annotation.RestController;
 import com.mathematics.admin.AdminDtos.AdminFeedbackSummary;
 import com.mathematics.admin.AdminDtos.ResolveFeedbackRequest;
 import com.mathematics.admin.AdminDtos.ResolveFeedbackResponse;
+import com.mathematics.guard.RequireAdmin;
 import com.mathematics.identity.CurrentUser;
 
 import jakarta.validation.Valid;
 
 /**
- * A21 纠错工单处理。权限在每个方法里显式要求，和项目其它接口口径一致。
+ * A21 纠错工单处理。
  */
 @RestController
+@RequireAdmin
 @RequestMapping("/api/v1/admin/feedback")
 public class AdminFeedbackController {
 
@@ -31,17 +33,14 @@ public class AdminFeedbackController {
     }
 
     @GetMapping
-    public List<AdminFeedbackSummary> list(CurrentUser me,
-                                          @RequestParam(required = false) String status,
+    public List<AdminFeedbackSummary> list(@RequestParam(required = false) String status,
                                           @RequestParam(required = false) Integer limit) {
-        me.requireAdmin();
         return adminFeedback.list(status, limit);
     }
 
     @PostMapping("/{id}/resolve")
     public ResolveFeedbackResponse resolve(CurrentUser me, @PathVariable long id,
                                            @Valid @RequestBody ResolveFeedbackRequest request) {
-        me.requireAdmin();
         return adminFeedback.resolve(me.requireId(), id, request);
     }
 }

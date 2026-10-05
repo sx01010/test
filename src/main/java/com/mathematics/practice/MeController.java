@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.mathematics.guard.RequireLogin;
 import com.mathematics.identity.CurrentUser;
 import com.mathematics.practice.PracticeDtos.MarkMasteredRequest;
 import com.mathematics.practice.PracticeDtos.MarkMasteredResponse;
@@ -21,6 +22,7 @@ import com.mathematics.support.CursorPage;
 import jakarta.validation.Valid;
 
 @RestController
+@RequireLogin
 @RequestMapping("/api/v1/me")
 public class MeController {
 

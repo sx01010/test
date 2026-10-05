@@ -11,6 +11,13 @@ spring:
       maximum-pool-size: 10
       minimum-idle: 2
 
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 500ms
+
   flyway:
     # 默认挂 seed：本地用 MySQL 当持久化开发库时，题库不能是空的。
     # 正式环境把 FLYWAY_LOCATIONS 设成 classpath:db/migration/mysql，示例题就不会进去。
@@ -21,7 +28,16 @@ mathematics:
     # 验证码不能进正式环境的日志：运维、日志采集、报错平台都能看到，等于给所有账号留了后门。
     # 接上真实邮件或短信通道之前，这个 profile 下的找回密码功能实际不可用。
     log-reset-codes: false
+  rate-limit:
+    # 多实例共享计数。Redis 挂掉时限流放行而不是拒绝，见 RedisRateLimiter
+    store: ${RATE_LIMIT_STORE:redis}
+    trust-forwarded-for: ${TRUST_FORWARDED_FOR:false}
   dev:
     # 这个 profile 也给正式环境用，所以不在这里造已知密码的管理员账号。
     # 第一个管理员靠手工提权：UPDATE `user` SET role = 'ADMIN' WHERE email = '你的邮箱';
     seed-demo-user: false
+
+management:
+  health:
+    redis:
+      enabled: true

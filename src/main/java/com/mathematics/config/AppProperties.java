@@ -5,7 +5,15 @@ import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "mathematics")
-public record AppProperties(Practice practice, Auth auth, Dev dev, Material material) {
+public record AppProperties(Practice practice, Auth auth, Dev dev, Material material, RateLimit rateLimit) {
+
+    /**
+     * @param enabled           总开关。集成测试默认关掉，否则同一个 MockMvc 连续注册几十个用户会撞上 IP 限额
+     * @param store             memory 或 redis。多实例部署必须用 redis，否则额度按实例数翻倍
+     * @param trustForwardedFor 前面有可信反向代理时才打开，直连时这个头谁都能伪造
+     */
+    public record RateLimit(boolean enabled, String store, boolean trustForwardedFor) {
+    }
 
     /**
      * @param masteryThreshold R12：连续做对多少次自动移出错题本
