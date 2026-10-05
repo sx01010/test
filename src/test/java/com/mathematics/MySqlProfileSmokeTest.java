@@ -173,6 +173,24 @@ class MySqlProfileSmokeTest {
         assertTrue(summary.get("submissionsToday").asInt() >= 1, summary.toString());
     }
 
+    @Test
+    void dailyProblemIsStableAndStreakCountsOnRealMySql() throws Exception {
+        String token = registerToken();
+        submit(token, 1, currentVersionId(1), "{\"choice\":\"B\"}");
+
+        JsonNode first = daily(token);
+        JsonNode second = daily(token);
+        assertEquals(first.get("problem").get("id").asLong(), second.get("problem").get("id").asLong());
+        assertEquals(1, first.get("streak").asInt());
+        assertTrue(first.get("practicedToday").asBoolean());
+    }
+
+    private JsonNode daily(String token) throws Exception {
+        MvcResult result = mockMvc.perform(get("/api/v1/daily").header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk()).andReturn();
+        return objectMapper.readTree(result.getResponse().getContentAsString());
+    }
+
     private int count(String table) {
         Integer rows = jdbc.queryForObject("SELECT COUNT(*) FROM `" + table + "`", Integer.class);
         return rows == null ? 0 : rows;

@@ -127,6 +127,12 @@ nav a.on { color: var(--accent-deep); background: var(--accent-soft); font-weigh
 .settings-links .link-btn { margin-top: 0 }
 .danger-link { color: var(--bad-ink) }
 .hint a { color: var(--accent-deep) }
+.daily-link { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; margin-bottom: 8px; border: 1.5px solid var(--line); border-radius: var(--radius-sm); cursor: pointer }
+.daily-link:hover { border-color: var(--accent) }
+.daily-link small { color: var(--ink-soft) }
+.daily-streak { margin: 10px 0 0; font-size: 14px }
+.daily-streak b { font-size: 22px; color: var(--accent-deep); margin-right: 2px }
+.daily-streak small { display: block; color: var(--ink-soft) }
 .dash-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; font-size: 14px }
 .dash-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 16px }
 .dash-kpi { padding: 14px 16px; display: flex; flex-direction: column; gap: 2px }

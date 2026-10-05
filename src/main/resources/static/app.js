@@ -415,6 +415,7 @@ function forgetSession() {
   syncAuth();
   closeModal();
   updateTodayPanel();
+  loadDaily();
 }
 
 function openDeleteAccountModal() {
@@ -949,7 +950,30 @@ function stopTimer() {
 
 /* ========================= 统计与我的练习 ========================= */
 
+async function loadDaily() {
+  const daily = await api('/daily').catch(() => null);
+  const panel = $('#dailyPanel');
+  if (!daily?.problem) {
+    panel.hidden = true;
+    return;
+  }
+  const p = daily.problem;
+  const state = daily.solved ? '<span class="state ok">今天已做对</span>'
+    : daily.attempted ? '<span class="state new">再试一次</span>' : '';
+  const streak = daily.streak === undefined ? '<p class="hint">登录后记录连续练习天数</p>'
+    : `<p class="daily-streak"><b>${daily.streak}</b> 天连续练习${daily.practicedToday || !daily.streak ? '' : '<small>今天做一题就能续上</small>'}</p>`;
+  $('#dailyBody').innerHTML = `
+    <a class="daily-link" id="dailyOpen">
+      <span class="admin-row-title">${esc(p.title)}</span>
+      <small>${TYPE_NAME[p.type] || p.type} · ${esc(p.grade)} · 难度 ${p.difficulty}</small>
+    </a>
+    ${state}${streak}`;
+  $('#dailyOpen').onclick = () => openProblem(p.id);
+  panel.hidden = false;
+}
+
 async function loadStats() {
+  loadDaily();
   if (!S.me) {
     S.today = { done: 0, correct: 0 };
     updateTodayPanel(0);
