@@ -1,10 +1,14 @@
 openapi: 3.0.3
 info:
   title: mathematics API
-  version: 0.1.0
+  version: 0.2.0
   description: |
     V1 最小 MVP：筛题 → 作答 → 即时判分 → 看解析 → 错题复练，外加来源清晰的 PDF 下载。
     列表一律游标分页；提交带 Idempotency-Key；答案与解析永远走独立接口。
+
+    限流：标了 429 的接口按固定窗口计数（按 IP、按用户或按账号），超限返回
+    `RATE_LIMITED` 与 `Retry-After` 头（秒）。只有部署在可信反向代理之后才按
+    `X-Forwarded-For` 取客户端 IP。
 servers:
   - url: http://localhost:8080
     description: local
@@ -41,6 +45,8 @@ paths:
                 $ref: '#/components/schemas/TokenResponse'
         '400':
           $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /api/v1/auth/login:
     post:
@@ -70,6 +76,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorBody'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /api/v1/auth/refresh:
     post:
@@ -93,6 +101,8 @@ paths:
                 $ref: '#/components/schemas/TokenResponse'
         '401':
           $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /api/v1/auth/logout:
     post:
@@ -125,9 +135,12 @@ paths:
         对面向中小学生的产品这份名单本身就是敏感信息。代价是填错邮箱得不到提示。
 
         规格要求同一账号 1 分钟内只发一次。冷却期内不签发新码，但响应不变：
-        回 429 会暴露账号存在，因为不存在的账号永远进不了冷却期。
+        回 429 会暴露账号存在，因为不存在的账号永远进不了冷却期。下面的 429 只按 IP 计数，
+        与账号是否存在无关。
 
         验证码 10 分钟失效，只投递到注册时填的邮箱或手机号，绝不出现在响应体里。
+        投递在事务提交后异步进行，响应耗时同样不随账号是否存在而变化。
+        当前接入邮件通道；短信通道通过实现 `SmsGateway` 接入。
       requestBody:
         required: true
         content:
@@ -143,6 +156,8 @@ paths:
                 $ref: '#/components/schemas/ResetCodeResponse'
         '400':
           $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /api/v1/auth/password/reset:
     post:
@@ -178,6 +193,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorBody'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /api/v1/users/me:
     get:
@@ -212,6 +229,75 @@ paths:
               schema:
                 $ref: '#/components/schemas/UserProfile'
         '400':
+          $ref: '#/components/responses/Error'
+    delete:
+      tags: [identity]
+      operationId: deleteMe
+      summary: 注销账号
+      description: |
+        需要再输一次密码。注销即匿名化：昵称改为「已注销用户」，邮箱与手机号清空（可重新注册），
+        所有令牌与未用的找回码立即作废；作答记录保留但不再关联任何联系方式。
+        管理员需先被撤销管理权限才能注销（403）。密码错误返回 400 而非 401。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteAccountRequest'
+      responses:
+        '204':
+          description: 已注销
+        '400':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+
+  /api/v1/daily:
+    get:
+      tags: [practice]
+      operationId: getDaily
+      summary: 每日一题与连续练习天数
+      security: []
+      description: |
+        每天第一次请求时从已发布题目里选定并落库，当天不再变化；30 天内不重复（题量不足时除外）；
+        选中的题被下架则当天重选。匿名只返回 date 与 problem；题库为空时 problem 缺省。
+        连续天数按「当天交过任意一道题」计，今天还没做时从昨天往回数。
+      responses:
+        '200':
+          description: 今日
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Daily'
+
+  /api/v1/assets/{key}:
+    get:
+      tags: [problem]
+      operationId: getAsset
+      summary: 题目配图
+      security: []
+      description: |
+        内容寻址、永久缓存（immutable）。带 `X-Content-Type-Options: nosniff` 与
+        `Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline'; sandbox`，
+        SVG 即使被直接打开也无法执行脚本。题干里以 `![说明](asset:KEY)` 引用。
+      parameters:
+        - in: path
+          name: key
+          required: true
+          schema:
+            type: string
+            pattern: '^[0-9a-f]{32}$'
+      responses:
+        '200':
+          description: 图片字节
+          content:
+            image/png: {}
+            image/jpeg: {}
+            image/webp: {}
+            image/svg+xml: {}
+        '404':
           $ref: '#/components/responses/Error'
 
   /api/v1/tags:
@@ -324,7 +410,7 @@ paths:
                 code: CONTENT_NOT_VISIBLE
                 message: 请先提交再查看解析
         '429':
-          $ref: '#/components/responses/Error'
+          $ref: '#/components/responses/RateLimited'
 
   /api/v1/problems/{id}/similar:
     get:
@@ -389,6 +475,8 @@ paths:
                 message: 题目已更新，请刷新后重试
         '400':
           $ref: '#/components/responses/Error'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /api/v1/submissions/{id}:
     get:
@@ -532,7 +620,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/FeedbackCreated'
         '429':
-          $ref: '#/components/responses/Error'
+          $ref: '#/components/responses/RateLimited'
 
   /api/v1/admin/problems:
     post:
@@ -709,7 +797,7 @@ paths:
         '404':
           $ref: '#/components/responses/Error'
         '429':
-          $ref: '#/components/responses/Error'
+          $ref: '#/components/responses/RateLimited'
 
   /api/v1/admin/materials/upload-ticket:
     post:
@@ -755,6 +843,60 @@ paths:
         '400':
           $ref: '#/components/responses/Error'
 
+  /api/v1/admin/assets:
+    post:
+      tags: [admin]
+      operationId: uploadAsset
+      summary: 上传题目配图
+      description: |
+        请求体是原始图片字节，最大 2 MB。类型按文件头判断（PNG / JPEG / WEBP / SVG），不信任 Content-Type；
+        SVG 含脚本、事件属性、foreignObject、外链等一律拒绝。同内容重复上传返回同一个 key。
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '200':
+          description: 已存储
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssetUploaded'
+        '400':
+          $ref: '#/components/responses/Error'
+        '403':
+          $ref: '#/components/responses/Error'
+
+  /api/v1/admin/dashboard:
+    get:
+      tags: [admin]
+      operationId: getDashboard
+      summary: 运营看板
+      description: |
+        「活跃」= 当天至少交过一次作答，纠错重判生成的记录不计。留存按注册日分批：
+        D1 / D7 为第 1 / 第 7 天回来作答的比例，未到观察日时字段缺省。
+      parameters:
+        - in: query
+          name: days
+          schema:
+            type: integer
+            default: 14
+            minimum: 1
+            maximum: 60
+          description: 超出范围会被收敛到 1–60
+      responses:
+        '200':
+          description: 看板
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dashboard'
+        '403':
+          $ref: '#/components/responses/Error'
+
 components:
   securitySchemes:
     bearerAuth:
@@ -798,6 +940,20 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorBody'
+    RateLimited:
+      description: 超出限流额度
+      headers:
+        Retry-After:
+          description: 多少秒后可以重试
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorBody'
+          example:
+            code: RATE_LIMITED
+            message: 操作太频繁，请稍后再试
 
   schemas:
     ProblemType:
@@ -831,7 +987,7 @@ components:
       properties:
         code:
           type: string
-          description: CONTENT_NOT_VISIBLE / PROBLEM_VERSION_STALE / ACCOUNT_LOCKED / VALIDATION_ERROR 等
+          description: CONTENT_NOT_VISIBLE / PROBLEM_VERSION_STALE / ACCOUNT_LOCKED / VALIDATION_ERROR / RATE_LIMITED 等
         message:
           type: string
         details:
@@ -1340,7 +1496,8 @@ components:
 
     UpsertProblemRequest:
       type: object
-      required: [title, type, stemMd, answerJson, explanationMd, tagIds, source, difficulty, grade]
+      required: [title, type, stemMd, answerJson, explanationMd, source, difficulty, grade]
+      description: tagIds 与 tagSlugs 至少给一个，可以混用；跨环境复用的导入文件应只用 tagSlugs。
       properties:
         id:
           type: integer
@@ -1376,6 +1533,11 @@ components:
           items:
             type: integer
             format: int64
+        tagSlugs:
+          type: array
+          items:
+            type: string
+          example: [calc-fractions, calc-series]
         source:
           $ref: '#/components/schemas/ProblemSourceInput'
         changeNote:
@@ -1625,3 +1787,127 @@ components:
           format: int64
         status:
           $ref: '#/components/schemas/PublishStatus'
+
+    DeleteAccountRequest:
+      type: object
+      required: [password]
+      properties:
+        password:
+          type: string
+
+    DailyProblem:
+      type: object
+      required: [id, title, type, difficulty, grade]
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        type:
+          $ref: '#/components/schemas/ProblemType'
+        difficulty:
+          type: integer
+        grade:
+          type: string
+
+    Daily:
+      type: object
+      required: [date]
+      description: streak / practicedToday / attempted / solved 只在登录时返回
+      properties:
+        date:
+          type: string
+          format: date
+        problem:
+          $ref: '#/components/schemas/DailyProblem'
+        streak:
+          type: integer
+          description: 连续练习天数
+        practicedToday:
+          type: boolean
+        attempted:
+          type: boolean
+          description: 今天做过每日一题
+        solved:
+          type: boolean
+          description: 今天做对了每日一题
+
+    AssetUploaded:
+      type: object
+      required: [key, url, markdown]
+      properties:
+        key:
+          type: string
+        url:
+          type: string
+          example: /api/v1/assets/0f3c…
+        markdown:
+          type: string
+          example: '![](asset:0f3c…)'
+
+    DashboardSummary:
+      type: object
+      properties:
+        totalUsers:
+          type: integer
+          description: 未注销账号数
+        activeToday:
+          type: integer
+        activeLast7Days:
+          type: integer
+        submissionsToday:
+          type: integer
+
+    DashboardDay:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+        activeUsers:
+          type: integer
+        newUsers:
+          type: integer
+        submissions:
+          type: integer
+        correctRate:
+          type: number
+          description: 0–1，当天无作答时缺省
+        submissionsPerActiveUser:
+          type: number
+
+    DashboardCohort:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+          description: 注册日
+        size:
+          type: integer
+        d1:
+          type: number
+          description: 0–1，未到观察日时缺省
+        d7:
+          type: number
+
+    Dashboard:
+      type: object
+      properties:
+        from:
+          type: string
+          format: date
+        to:
+          type: string
+          format: date
+        summary:
+          $ref: '#/components/schemas/DashboardSummary'
+        days:
+          type: array
+          items:
+            $ref: '#/components/schemas/DashboardDay'
+        cohorts:
+          type: array
+          items:
+            $ref: '#/components/schemas/DashboardCohort'
