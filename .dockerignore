@@ -1,0 +1,8 @@
+target/
+data/
+docs/
+ui-prototypes/
+.git/
+.idea/
+*.iml
+.env

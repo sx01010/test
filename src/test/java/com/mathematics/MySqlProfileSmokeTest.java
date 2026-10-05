@@ -2,9 +2,12 @@ package com.mathematics;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -15,6 +18,7 @@ import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.dao.DataAccessException;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
@@ -116,6 +120,42 @@ class MySqlProfileSmokeTest {
         assertEquals(1, countWhere("problem_source", "problem_id = " + id), "来源登记只该有一条，不能被写成两条");
         assertEquals(2, countWhere("problem_version", "problem_id = " + id));
         assertEquals("DRAFT", jdbc.queryForObject("SELECT status FROM problem WHERE id = ?", String.class, id));
+    }
+
+    /**
+     * V9 先 DROP CHECK 再加回放宽后的约束。MySQL 8.0.16 起才真正执行 CHECK，H2 的语法也不同，
+     * 注销把 email、phone 都置空正好踩在这条约束上。
+     */
+    @Test
+    void accountDeletionPassesRelaxedContactCheckOnRealMySql() throws Exception {
+        String token = registerToken();
+        long id = userId(token);
+
+        mockMvc.perform(delete("/api/v1/users/me").header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"password\":\"demo12345\"}"))
+                .andExpect(status().isNoContent());
+        assertEquals("DELETED", jdbc.queryForObject("SELECT status FROM `user` WHERE id = ?", String.class, id));
+
+        // 约束仍然拦得住未注销却没有联系方式的行。MySQL 的 3819 Spring 没做分类，只能认约束名
+        DataAccessException violated = assertThrows(DataAccessException.class, () -> jdbc.update(
+                "INSERT INTO `user` (nickname, password_hash, role, status) VALUES ('x', 'x', 'USER', 'ACTIVE')"));
+        assertTrue(violated.getMessage().contains("ck_user_contact"), violated.getMessage());
+    }
+
+    @Test
+    void assetUploadRoundTripsOnRealMySql() throws Exception {
+        String token = registerToken();
+        jdbc.update("UPDATE `user` SET role = 'ADMIN' WHERE id = ?", userId(token));
+        byte[] png = {(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 13, 'I', 'H', 'D', 'R'};
+
+        MvcResult uploaded = mockMvc.perform(post("/api/v1/admin/assets").header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_OCTET_STREAM).content(png))
+                .andExpect(status().isOk()).andReturn();
+        String key = objectMapper.readTree(uploaded.getResponse().getContentAsString()).get("key").asText();
+
+        mockMvc.perform(get("/api/v1/assets/{key}", key))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Content-Type", "image/png"));
     }
 
     private int count(String table) {

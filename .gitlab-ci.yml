@@ -1,0 +1,59 @@
+stages:
+  - test
+  - package
+
+default:
+  image: maven:3.9-eclipse-temurin-17
+
+variables:
+  MAVEN_OPTS: "-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository"
+  MAVEN_CLI_OPTS: "-B --no-transfer-progress"
+
+cache:
+  key:
+    files: [pom.xml]
+  paths: [.m2/repository]
+
+# 默认 profile（H2 内存库）下的全部单元与集成测试。MySQL / Redis 相关的类没设环境变量会自动跳过
+test:h2:
+  stage: test
+  script:
+    - mvn $MAVEN_CLI_OPTS test
+  artifacts:
+    when: always
+    reports:
+      junit: target/surefire-reports/TEST-*.xml
+
+# 真 MySQL 8.0 上从空库跑完全部迁移，再跑 H2 测不出来的那几处差异；顺带验 Redis 限流脚本
+test:mysql:
+  stage: test
+  services:
+    - name: mysql:8.0
+      alias: mysql
+      command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci", "--default-time-zone=+08:00"]
+    - name: redis:7-alpine
+      alias: redis
+  variables:
+    MYSQL_DATABASE: mathematics
+    MYSQL_USER: mathematics
+    MYSQL_PASSWORD: ci_only_password
+    MYSQL_ROOT_PASSWORD: ci_only_root
+    DB_HOST: mysql
+    DB_PASSWORD: ci_only_password
+    REDIS_HOST: redis
+  script:
+    - mvn $MAVEN_CLI_OPTS test -Dtest='MySqlProfileSmokeTest,RedisRateLimiterTest' -Dsurefire.failIfNoSpecifiedTests=false
+  artifacts:
+    when: always
+    reports:
+      junit: target/surefire-reports/TEST-*.xml
+
+package:jar:
+  stage: package
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  script:
+    - mvn $MAVEN_CLI_OPTS -DskipTests package
+  artifacts:
+    paths: [target/mathematics-*.jar]
+    expire_in: 30 days
